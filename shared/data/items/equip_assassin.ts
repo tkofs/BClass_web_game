@@ -259,7 +259,7 @@ export const EQUIP_ASSASSIN: Item[] = [
   },
   {
     id: 'leg_warglaive_oh_rogue', name: '아지노스의 전투검 (보조장비)', description: '주장비와 결합할 때 비로소 진정한 파괴력을 내뿜습니다.',
-    type: 'weapon', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_02.svg',
+    type: 'offhand', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_02.svg',
     stackable: false, maxStack: 1, sellPrice: 60000, requiredClass: 'assassin',
     stats: { attack: 220, critRate: 0.1, critDamage: 0.2 }
   },

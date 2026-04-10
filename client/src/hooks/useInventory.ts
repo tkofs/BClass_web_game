@@ -16,12 +16,12 @@ export interface EquippedSlotInfo {
   enhanceLevel: number;
 }
 
-const EQUIP_SLOTS = ['weapon', 'shield', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory'] as const;
-const EQUIP_TYPES = new Set(['weapon', 'shield', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory']);
+const EQUIP_SLOTS = ['weapon', 'offhand', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory'] as const;
+const EQUIP_TYPES = new Set(['weapon', 'shield', 'offhand', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory']);
 
 const SLOT_LABELS: Record<string, string> = {
   weapon: '무기',
-  shield: '방패',
+  offhand: '보조장비',
   helm: '투구',
   shoulders: '견갑',
   chest: '흉갑',

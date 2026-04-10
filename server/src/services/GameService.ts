@@ -139,7 +139,8 @@ export function useItem(saveData: SaveData, itemId: string): UseItemResult {
 
 const EQUIP_SLOT_MAP: Record<string, string[]> = {
   weapon: ['weapon'],
-  shield: ['shield'],
+  shield: ['offhand'],
+  offhand: ['offhand'],
   helm: ['helm'],
   shoulders: ['shoulders'],
   chest: ['chest'],
@@ -211,7 +212,7 @@ export function unequipItem(
 // Equipment Enhancement
 // ────────────────────────────────────────────────────────────
 
-const EQUIP_TYPES = new Set(['weapon', 'shield', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory']);
+const EQUIP_TYPES = new Set(['weapon', 'shield', 'offhand', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory']);
 const MAX_ENHANCE_LEVEL = 99;
 
 /**

@@ -121,7 +121,7 @@ export const EQUIP_PRIEST: Item[] = [
   },
   {
     id: 'unc_offhand_01', name: '고대의 기도서', description: '여러 성스러운 고대 기도문이 빼곡히 적힌 책입니다.',
-    type: 'weapon', rarity: 'uncommon', iconUrl: '/assets/items/inv_misc_book_04.svg',
+    type: 'offhand', rarity: 'uncommon', iconUrl: '/assets/items/inv_misc_book_04.svg',
     stackable: false, maxStack: 1, sellPrice: 100, requiredClass: 'priest',
     stats: { attack: 20, critRate: 0.02 }
   },
@@ -171,7 +171,7 @@ export const EQUIP_PRIEST: Item[] = [
   },
   {
     id: 'rar_offhand_01', name: '빛나는 정령의 파편', description: '나루의 힘이 희미하게 남아있는 신성한 보석입니다.',
-    type: 'weapon', rarity: 'rare', iconUrl: '/assets/items/inv_misc_orb_02.svg',
+    type: 'offhand', rarity: 'rare', iconUrl: '/assets/items/inv_misc_orb_02.svg',
     stackable: false, maxStack: 1, sellPrice: 600, requiredClass: 'priest',
     stats: { attack: 35, hp: 30, critRate: 0.03 }
   },
@@ -233,7 +233,7 @@ export const EQUIP_PRIEST: Item[] = [
   },
   {
     id: 'epc_offhand_01', name: '축복받은 치유의 서', description: '생명 마법의 극의가 담겨있는 보조 장비 마도서입니다.',
-    type: 'weapon', rarity: 'epic', iconUrl: '/assets/items/inv_misc_book_05.svg',
+    type: 'offhand', rarity: 'epic', iconUrl: '/assets/items/inv_misc_book_05.svg',
     stackable: false, maxStack: 1, sellPrice: 3500, requiredClass: 'priest',
     stats: { attack: 65, hp: 60, critRate: 0.05 }
   },

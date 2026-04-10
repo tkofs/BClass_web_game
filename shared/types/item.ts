@@ -11,11 +11,12 @@ export interface Item {
   stats?: Partial<ItemStats>;
   useEffect?: UseEffect;
   requiredClass?: CharacterClass;
+  setId?: string;
 }
 
 import type { CharacterClass } from './character';
 
-export type ItemType = 'weapon' | 'shield' | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'belt' | 'legs' | 'boots' | 'accessory' | 'consumable' | 'material';
+export type ItemType = 'weapon' | 'shield' | 'offhand' | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'belt' | 'legs' | 'boots' | 'accessory' | 'consumable' | 'material';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
 export interface ItemStats {

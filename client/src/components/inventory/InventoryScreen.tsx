@@ -46,6 +46,7 @@ const rarityTextColors: Record<string, string> = {
 const typeLabels: Record<string, string> = {
   weapon: '무기',
   shield: '방패',
+  offhand: '보조장비',
   helm: '투구',
   shoulders: '견갑',
   chest: '흉갑',
@@ -61,6 +62,7 @@ const typeLabels: Record<string, string> = {
 const typeEmojis: Record<string, string> = {
   weapon: '\u2694',
   shield: '\uD83D\uDEE1',
+  offhand: '\uD83D\uDEE1',
   helm: '\uD83E\uDE96',
   shoulders: '\uD83E\uDDB6',
   chest: '\uD83E\uDDE5',
@@ -390,8 +392,8 @@ function ItemDetailModal({
 }) {
   if (!item) return null;
 
-  const isEquipType = ['weapon', 'shield', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory'].includes(item.type);
-  const equipSlot = item.type;
+  const isEquipType = ['weapon', 'shield', 'offhand', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory'].includes(item.type);
+  const equipSlot = item.type === 'shield' ? 'offhand' : item.type;
   const mult = 1 + enhanceLevel;
 
   // Current equipped item stats for comparison
@@ -494,6 +496,9 @@ function InventoryScreen() {
   // Candidates for equip selection (items in inventory matching the slot type)
   const equipCandidates = useMemo(() => {
     if (!equipSelectSlot || !saveData) return [];
+    if (equipSelectSlot === 'offhand') {
+      return equipmentItems.filter((i) => i.data.type === 'shield' || i.data.type === 'offhand');
+    }
     return equipmentItems.filter((i) => i.data.type === equipSelectSlot);
   }, [equipSelectSlot, equipmentItems, saveData]);
 

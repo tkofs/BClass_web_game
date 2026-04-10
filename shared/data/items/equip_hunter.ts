@@ -284,7 +284,7 @@ export const EQUIP_HUNTER: Item[] = [
   },
   {
     id: 'leg_rexar_axes_oh', name: '렉사르의 거친 도끼 (보조장비)', description: '미샤와 함께 전투에 나설 때 렉사르가 쥐는 보조 도끼입니다.',
-    type: 'weapon', rarity: 'legendary', iconUrl: '/assets/items/inv_axe_07.svg',
+    type: 'offhand', rarity: 'legendary', iconUrl: '/assets/items/inv_axe_07.svg',
     stackable: false, maxStack: 1, sellPrice: 45000, requiredClass: 'hunter',
     stats: { attack: 170, defense: 80, critRate: 0.08, critDamage: 0.15 }
   },

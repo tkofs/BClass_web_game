@@ -15,6 +15,7 @@ export interface SaveData {
   abyssHighest: number;
   shopStock: ShopItem[];
   shopRefreshAt: string;
+  dropHistory: DropRecord[];
   createdAt: string;
   lastPlayedAt: string;
 }
@@ -41,6 +42,12 @@ export interface AuthResponse {
   message: string;
   data?: SaveData;
   token?: string;
+}
+
+export interface DropRecord {
+  itemId: string;
+  source: string;
+  date: string;
 }
 
 export interface ShopItem {

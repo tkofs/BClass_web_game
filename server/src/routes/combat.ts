@@ -3,7 +3,7 @@ import { validate } from '../middleware/validate';
 import * as AuthService from '../services/AuthService';
 import * as CombatService from '../services/CombatService';
 import * as GameService from '../services/GameService';
-import { MONSTERS, ITEMS } from '../../../shared/data';
+import { MONSTERS, ITEMS, DUNGEONS } from '../../../shared/data';
 
 const router = Router();
 
@@ -23,7 +23,7 @@ function extractSaveCode(req: Request, res: Response): string | null {
 }
 
 /** 웨이브 클리어 보상 적용 (전투 데이터는 유지) */
-function applyWaveRewards(saveCode: string, battleId: string) {
+function applyWaveRewards(saveCode: string, battleId: string, source?: string) {
   const saveData = AuthService.getSaveData(saveCode);
   if (!saveData) return { rewards: null, levelUp: null };
 
@@ -33,8 +33,18 @@ function applyWaveRewards(saveCode: string, battleId: string) {
   const levelUp = GameService.gainExp(saveData, rewards.exp);
   saveData.gold += rewards.gold;
 
+  if (!saveData.dropHistory) saveData.dropHistory = [];
   for (const drop of rewards.items) {
     GameService.addItemSmart(saveData, drop.itemId, drop.quantity);
+    // epic/legendary 드랍 히스토리 기록
+    const itemDef = ITEMS.find((i: any) => i.id === drop.itemId);
+    if (itemDef && (itemDef.rarity === 'epic' || itemDef.rarity === 'legendary')) {
+      saveData.dropHistory.push({
+        itemId: drop.itemId,
+        source: source ?? '알 수 없음',
+        date: new Date().toISOString(),
+      });
+    }
   }
 
   // 도감 업데이트 + 전투 로그에 보상 표시
@@ -200,7 +210,9 @@ router.post(
       // 웨이브 클리어 공통 처리: 보상 지급 + 다음 웨이브 or 던전 클리어
       function handleWaveClear() {
         const isLast = CombatService.isLastWave(battleId);
-        const { rewards, levelUp } = applyWaveRewards(saveCode, battleId);
+        const waveInfo = CombatService.getWaveInfo(battleId);
+        const dungeonName = DUNGEONS.find((d) => d.id === dungeonId)?.name ?? dungeonId;
+        const { rewards, levelUp } = applyWaveRewards(saveCode, battleId, dungeonName);
 
         if (!isLast) {
           CombatService.advanceWave(battleId);
@@ -348,8 +360,14 @@ router.post(
           if (rewards) {
             const levelUp = GameService.gainExp(saveData, rewards.exp);
             saveData.gold += rewards.gold;
+            if (!saveData.dropHistory) saveData.dropHistory = [];
+            const abyssSource = `심연의 나락 ${floor}층`;
             for (const drop of rewards.items) {
               GameService.addItemSmart(saveData, drop.itemId, drop.quantity);
+              const itemDef = ITEMS.find((i: any) => i.id === drop.itemId);
+              if (itemDef && (itemDef.rarity === 'epic' || itemDef.rarity === 'legendary')) {
+                saveData.dropHistory.push({ itemId: drop.itemId, source: abyssSource, date: new Date().toISOString() });
+              }
             }
             AuthService.saveProgress(saveCode, saveData);
             CombatService.removeBattle(battleId);

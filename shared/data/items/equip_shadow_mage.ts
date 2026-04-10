@@ -121,7 +121,7 @@ export const EQUIP_SHADOW_MAGE: Item[] = [
   },
   {
     id: 'unc_offhand_01', name: '어둠의 기록서', description: '알 수 없는 언어로 적힌 불길한 마도서입니다.',
-    type: 'weapon', rarity: 'uncommon', iconUrl: '/assets/items/inv_misc_book_01.svg',
+    type: 'offhand', rarity: 'uncommon', iconUrl: '/assets/items/inv_misc_book_01.svg',
     stackable: false, maxStack: 1, sellPrice: 100, requiredClass: 'shadow_mage',
     stats: { attack: 20, critRate: 0.02 }
   },
@@ -171,7 +171,7 @@ export const EQUIP_SHADOW_MAGE: Item[] = [
   },
   {
     id: 'rar_offhand_01', name: '그림자 해골', description: '흑마술의 매개체로 사용되는 불길한 해골입니다.',
-    type: 'weapon', rarity: 'rare', iconUrl: '/assets/items/inv_misc_bone_skull_01.svg',
+    type: 'offhand', rarity: 'rare', iconUrl: '/assets/items/inv_misc_bone_skull_01.svg',
     stackable: false, maxStack: 1, sellPrice: 600, requiredClass: 'shadow_mage',
     stats: { attack: 35, critRate: 0.04, critDamage: 0.05 }
   },
@@ -233,7 +233,7 @@ export const EQUIP_SHADOW_MAGE: Item[] = [
   },
   {
     id: 'epc_offhand_01', name: '심판관의 영혼책', description: '어둠의 심판을 내릴 때 사용하는 보조 장비 마도서입니다.',
-    type: 'weapon', rarity: 'epic', iconUrl: '/assets/items/inv_misc_book_02.svg',
+    type: 'offhand', rarity: 'epic', iconUrl: '/assets/items/inv_misc_book_02.svg',
     stackable: false, maxStack: 1, sellPrice: 3500, requiredClass: 'shadow_mage',
     stats: { attack: 60, critRate: 0.07, critDamage: 0.1 }
   },
@@ -265,7 +265,7 @@ export const EQUIP_SHADOW_MAGE: Item[] = [
   },
   {
     id: 'leg_medivh_book', name: '메디브의 흑마도서', description: '차원문을 열고 악마를 부리던 메디브의 친필 지식이 담긴 보조 장비입니다.',
-    type: 'weapon', rarity: 'legendary', iconUrl: '/assets/items/inv_misc_book_03.svg',
+    type: 'offhand', rarity: 'legendary', iconUrl: '/assets/items/inv_misc_book_03.svg',
     stackable: false, maxStack: 1, sellPrice: 60000, requiredClass: 'shadow_mage',
     stats: { attack: 150, critRate: 0.12, critDamage: 0.25 }
   },

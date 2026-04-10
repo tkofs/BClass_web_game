@@ -259,7 +259,7 @@ export const EQUIP_DARK_KNIGHT: Item[] = [
   },
   {
     id: 'leg_warglaive_oh', name: '아지노스의 전투검 (보조장비)', description: '주장비와 세트를 이루면 전투력이 급증합니다.',
-    type: 'weapon', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_02.svg',
+    type: 'offhand', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_02.svg',
     stackable: false, maxStack: 1, sellPrice: 50000, requiredClass: 'dark_knight',
     stats: { attack: 220, critRate: 0.1, critDamage: 0.2 },
   },

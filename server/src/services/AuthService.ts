@@ -111,7 +111,7 @@ export function createNewGame(
       { itemId: 'hp_potion_small', quantity: 3 },
       { itemId: 'mp_potion_small', quantity: 1 },
     ],
-    equippedItems: { weapon: null, shield: null, helm: null, shoulders: null, chest: null, gloves: null, belt: null, legs: null, boots: null, accessory: null },
+    equippedItems: { weapon: null, offhand: null, helm: null, shoulders: null, chest: null, gloves: null, belt: null, legs: null, boots: null, accessory: null },
     enhanceLevels: {},
     bestiary: [],
     dungeonProgress: {},
@@ -119,6 +119,7 @@ export function createNewGame(
     abyssHighest: 0,
     shopStock: [],
     shopRefreshAt: now,
+    dropHistory: [],
     createdAt: now,
     lastPlayedAt: now,
   };
