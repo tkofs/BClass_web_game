@@ -142,25 +142,25 @@ export const EQUIP_PRIEST: Item[] = [
   {
     id: 'pr_rar_robe_01', name: '달빛매듭 로브', description: '치유 사제들을 위해 특별히 제작된 재봉술의 걸작입니다.',
     type: 'chest', rarity: 'rare', iconUrl: '/assets/items/inv_chest_cloth_08.svg',
-    stackable: false, maxStack: 1, sellPrice: 900, requiredClass: 'priest',
+    stackable: false, maxStack: 1, sellPrice: 900, setId: 'set_pr_mooncloth', requiredClass: 'priest',
     stats: { defense: 45, hp: 50, attack: 55, critRate: 0.03 }
   },
   {
     id: 'pr_rar_pants_01', name: '달빛매듭 바지', description: '달빛의 축복이 깃들어 마나 회복을 돕습니다.',
     type: 'legs', rarity: 'rare', iconUrl: '/assets/items/inv_pants_cloth_07.svg',
-    stackable: false, maxStack: 1, sellPrice: 850, requiredClass: 'priest',
+    stackable: false, maxStack: 1, sellPrice: 850, setId: 'set_pr_mooncloth', requiredClass: 'priest',
     stats: { defense: 40, hp: 45, attack: 50, critRate: 0.02 }
   },
   {
     id: 'pr_rar_cowl_01', name: '달빛매듭 두건', description: '머리를 감싸는 순간 마법의 흐름이 맑아짐을 느낍니다.',
     type: 'helm', rarity: 'rare', iconUrl: '/assets/items/inv_helmet_16.svg',
-    stackable: false, maxStack: 1, sellPrice: 800, requiredClass: 'priest',
+    stackable: false, maxStack: 1, sellPrice: 800, setId: 'set_pr_mooncloth', requiredClass: 'priest',
     stats: { defense: 35, hp: 40, attack: 45, critDamage: 0.05 }
   },
   {
     id: 'pr_rar_shoes_01', name: '달빛매듭 덧신', description: '깃털처럼 가볍게 전장을 누비며 아군을 도울 수 있습니다.',
     type: 'boots', rarity: 'rare', iconUrl: '/assets/items/inv_boots_cloth_06.svg',
-    stackable: false, maxStack: 1, sellPrice: 750, requiredClass: 'priest',
+    stackable: false, maxStack: 1, sellPrice: 750, setId: 'set_pr_mooncloth', requiredClass: 'priest',
     stats: { defense: 28, hp: 30, attack: 35 }
   },
   {

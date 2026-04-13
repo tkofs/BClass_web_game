@@ -68,37 +68,37 @@ export const EQUIP_DARK_KNIGHT: Item[] = [
   {
     id: 'dk_unc_sword_01', name: '지옥무쇠 대검', description: '지옥무쇠로 벼려낸 튼튼한 양손검입니다.',
     type: 'weapon', rarity: 'uncommon', iconUrl: '/assets/items/inv_sword_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 150, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 150, setId: 'set_dk_felsteel', requiredClass: 'dark_knight',
     stats: { attack: 35 },
   },
   {
     id: 'dk_unc_shield_01', name: '지옥무쇠 방패', description: '지옥무쇠 주괴를 두드려 만든 방패입니다.',
     type: 'shield', rarity: 'uncommon', iconUrl: '/assets/items/inv_shield_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 120, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 120, setId: 'set_dk_felsteel', requiredClass: 'dark_knight',
     stats: { defense: 40, hp: 30 },
   },
   {
     id: 'dk_unc_chest_01', name: '지옥무쇠 흉갑', description: '단단한 지옥무쇠 판금 갑옷입니다.',
     type: 'chest', rarity: 'uncommon', iconUrl: '/assets/items/inv_chest_plate_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 180, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 180, setId: 'set_dk_felsteel', requiredClass: 'dark_knight',
     stats: { defense: 50, hp: 80 },
   },
   {
     id: 'dk_unc_legs_01', name: '지옥무쇠 다리갑옷', description: '전투 시 하체를 보호해 줍니다.',
     type: 'legs', rarity: 'uncommon', iconUrl: '/assets/items/inv_pants_plate_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 160, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 160, setId: 'set_dk_felsteel', requiredClass: 'dark_knight',
     stats: { defense: 45, hp: 70 },
   },
   {
     id: 'dk_unc_helm_01', name: '지옥무쇠 투구', description: '아웃랜드 초반 모험가들의 국민 투구입니다.',
     type: 'helm', rarity: 'uncommon', iconUrl: '/assets/items/inv_helmet_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 140, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 140, setId: 'set_dk_felsteel', requiredClass: 'dark_knight',
     stats: { defense: 35, hp: 50 },
   },
   {
     id: 'dk_unc_boots_01', name: '지옥무쇠 장화', description: '발을 보호하는 튼튼한 장화입니다.',
     type: 'boots', rarity: 'uncommon', iconUrl: '/assets/items/inv_boots_plate_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 100, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 100, setId: 'set_dk_felsteel', requiredClass: 'dark_knight',
     stats: { defense: 25, hp: 40 },
   },
   {
@@ -254,13 +254,13 @@ export const EQUIP_DARK_KNIGHT: Item[] = [
   {
     id: 'leg_warglaive_mh', name: '아지노스의 전투검 (주장비)', description: '일리단 스톰레이지가 사용하던 전설의 무기입니다.',
     type: 'weapon', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_01.svg',
-    stackable: false, maxStack: 1, sellPrice: 50000, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 50000, setId: 'set_dk_warglaive', requiredClass: 'dark_knight',
     stats: { attack: 250, critRate: 0.15, critDamage: 0.3 },
   },
   {
     id: 'leg_warglaive_oh', name: '아지노스의 전투검 (보조장비)', description: '주장비와 세트를 이루면 전투력이 급증합니다.',
     type: 'offhand', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 50000, requiredClass: 'dark_knight',
+    stackable: false, maxStack: 1, sellPrice: 50000, setId: 'set_dk_warglaive', requiredClass: 'dark_knight',
     stats: { attack: 220, critRate: 0.1, critDamage: 0.2 },
   },
   {

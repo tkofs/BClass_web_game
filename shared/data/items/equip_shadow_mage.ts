@@ -74,43 +74,43 @@ export const EQUIP_SHADOW_MAGE: Item[] = [
   {
     id: 'sm_unc_wand_01', name: '황천매듭 마술봉', description: '황천매듭의 마력을 뿜어내는 마술봉입니다.',
     type: 'weapon', rarity: 'uncommon', iconUrl: '/assets/items/inv_wand_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 110, requiredClass: 'shadow_mage',
+    stackable: false, maxStack: 1, sellPrice: 110, setId: 'set_sm_netherweave', requiredClass: 'shadow_mage',
     stats: { attack: 35, critRate: 0.01 }
   },
   {
     id: 'sm_unc_robe_01', name: '황천매듭 로브', description: '아웃랜드의 재봉사들이 즐겨 만드는 튼튼한 마법사 로브입니다.',
     type: 'chest', rarity: 'uncommon', iconUrl: '/assets/items/inv_chest_cloth_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 160, requiredClass: 'shadow_mage',
+    stackable: false, maxStack: 1, sellPrice: 160, setId: 'set_sm_netherweave', requiredClass: 'shadow_mage',
     stats: { defense: 25, hp: 20, attack: 15 }
   },
   {
     id: 'sm_unc_pants_01', name: '황천매듭 바지', description: '마나의 흐름을 원활하게 돕는 바지입니다.',
     type: 'legs', rarity: 'uncommon', iconUrl: '/assets/items/inv_pants_cloth_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 140, requiredClass: 'shadow_mage',
+    stackable: false, maxStack: 1, sellPrice: 140, setId: 'set_sm_netherweave', requiredClass: 'shadow_mage',
     stats: { defense: 22, hp: 18, attack: 12 }
   },
   {
     id: 'sm_unc_cowl_01', name: '황천매듭 두건', description: '집중력을 높여주는 마법의 두건입니다.',
     type: 'helm', rarity: 'uncommon', iconUrl: '/assets/items/inv_helmet_10.svg',
-    stackable: false, maxStack: 1, sellPrice: 120, requiredClass: 'shadow_mage',
+    stackable: false, maxStack: 1, sellPrice: 120, setId: 'set_sm_netherweave', requiredClass: 'shadow_mage',
     stats: { defense: 18, hp: 15, attack: 10 }
   },
   {
     id: 'sm_unc_shoes_01', name: '황천매듭 장화', description: '대지의 마력과 공명하는 푹신한 장화입니다.',
     type: 'boots', rarity: 'uncommon', iconUrl: '/assets/items/inv_boots_cloth_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 90, requiredClass: 'shadow_mage',
+    stackable: false, maxStack: 1, sellPrice: 90, setId: 'set_sm_netherweave', requiredClass: 'shadow_mage',
     stats: { defense: 15, hp: 12 }
   },
   {
     id: 'sm_unc_shoulders_01', name: '황천매듭 어깨보호대', description: '천으로 만들어졌지만 꽤 훌륭한 방어력을 지닙니다.',
     type: 'shoulders', rarity: 'uncommon', iconUrl: '/assets/items/inv_shoulder_10.svg',
-    stackable: false, maxStack: 1, sellPrice: 100, requiredClass: 'shadow_mage',
+    stackable: false, maxStack: 1, sellPrice: 100, setId: 'set_sm_netherweave', requiredClass: 'shadow_mage',
     stats: { defense: 16, hp: 14 }
   },
   {
     id: 'sm_unc_gloves_01', name: '황천매듭 장갑', description: '주문 영창 속도를 미세하게 올려주는 장갑입니다.',
     type: 'gloves', rarity: 'uncommon', iconUrl: '/assets/items/inv_gauntlets_05.svg',
-    stackable: false, maxStack: 1, sellPrice: 85, requiredClass: 'shadow_mage',
+    stackable: false, maxStack: 1, sellPrice: 85, setId: 'set_sm_netherweave', requiredClass: 'shadow_mage',
     stats: { defense: 12, hp: 10, critRate: 0.01 }
   },
   {

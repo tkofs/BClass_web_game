@@ -148,19 +148,19 @@ export const EQUIP_HUNTER: Item[] = [
   {
     id: 'hn_rar_chest_01', name: '야수왕의 흉갑', description: '사냥꾼 전용 영웅 던전 세트인 야수왕 세트의 흉갑입니다.',
     type: 'chest', rarity: 'rare', iconUrl: '/assets/items/inv_chest_chain_03.svg',
-    stackable: false, maxStack: 1, sellPrice: 900, requiredClass: 'hunter',
+    stackable: false, maxStack: 1, sellPrice: 900, setId: 'set_hn_beastking', requiredClass: 'hunter',
     stats: { defense: 80, hp: 75, attack: 30 }
   },
   {
     id: 'hn_rar_legs_01', name: '야수왕의 다리갑옷', description: '착용 시 야수와의 교감이 깊어집니다.',
     type: 'legs', rarity: 'rare', iconUrl: '/assets/items/inv_pants_chain_03.svg',
-    stackable: false, maxStack: 1, sellPrice: 880, requiredClass: 'hunter',
+    stackable: false, maxStack: 1, sellPrice: 880, setId: 'set_hn_beastking', requiredClass: 'hunter',
     stats: { defense: 75, hp: 70, critRate: 0.03 }
   },
   {
     id: 'hn_rar_helm_01', name: '야수왕의 가면', description: '늑대의 머리뼈로 장식된 위협적인 가면입니다.',
     type: 'helm', rarity: 'rare', iconUrl: '/assets/items/inv_helmet_07.svg',
-    stackable: false, maxStack: 1, sellPrice: 820, requiredClass: 'hunter',
+    stackable: false, maxStack: 1, sellPrice: 820, setId: 'set_hn_beastking', requiredClass: 'hunter',
     stats: { defense: 65, hp: 60, critRate: 0.04 }
   },
   {
@@ -308,7 +308,7 @@ export const EQUIP_HUNTER: Item[] = [
   {
     id: 'leg_bm_pet_trinket', name: '야수왕의 뿔피리', description: '이 피리를 불면 아제로스 모든 야수들의 투쟁심이 끓어오릅니다.',
     type: 'accessory', rarity: 'legendary', iconUrl: '/assets/items/inv_misc_horn_01.svg',
-    stackable: false, maxStack: 1, sellPrice: 40000, requiredClass: 'hunter',
+    stackable: false, maxStack: 1, sellPrice: 40000, setId: 'set_hn_beastking', requiredClass: 'hunter',
     stats: { attack: 150, defense: 150, hp: 500, critRate: 0.1, critDamage: 0.25 }
   }
 ];

@@ -10,7 +10,8 @@ import type {
   SkillState,
   SaveData,
 } from '../../../shared/types';
-import { CHARACTERS, SKILLS, MONSTERS, DUNGEONS, ITEMS } from '../../../shared/data';
+import { CHARACTERS, SKILLS, MONSTERS, DUNGEONS, ITEMS, SETS } from '../../../shared/data';
+import type { SetBonus } from '../../../shared/data/sets';
 
 // ────────────────────────────────────────────────────────────
 // Battle state store (keyed by battle id)
@@ -19,6 +20,31 @@ const battleStore = new Map<string, BattleState>();
 const skillStateStore = new Map<string, SkillState[]>();
 const battleDungeonMap = new Map<string, string>();
 const battleCritMap = new Map<string, { critRate: number; critDamage: number }>();
+const battleSetActiveMap = new Map<string, SetBonus['active'][]>();
+
+/** Calculate active set bonuses from equipped items */
+function calculateSetBonuses(equippedItemIds: string[]): { statMods: { atkPercent: number; defPercent: number; hpPercent: number; mpPercent: number; critRateFlat: number; critDmgPercent: number }; actives: SetBonus['active'][] } {
+  const statMods = { atkPercent: 0, defPercent: 0, hpPercent: 0, mpPercent: 0, critRateFlat: 0, critDmgPercent: 0 };
+  const actives: SetBonus['active'][] = [];
+
+  for (const set of SETS) {
+    const count = set.pieces.filter((p) => equippedItemIds.includes(p)).length;
+    for (const bonus of set.bonuses) {
+      if (count >= bonus.requiredCount) {
+        if (bonus.stats) {
+          statMods.atkPercent += bonus.stats.atkPercent ?? 0;
+          statMods.defPercent += bonus.stats.defPercent ?? 0;
+          statMods.hpPercent += bonus.stats.hpPercent ?? 0;
+          statMods.mpPercent += bonus.stats.mpPercent ?? 0;
+          statMods.critRateFlat += bonus.stats.critRateFlat ?? 0;
+          statMods.critDmgPercent += bonus.stats.critDmgPercent ?? 0;
+        }
+        if (bonus.active) actives.push(bonus.active);
+      }
+    }
+  }
+  return { statMods, actives };
+}
 const battleWaveMap = new Map<string, { current: number; total: number; dungeonId: string; saveData: SaveData }>();
 
 export function getBattle(id: string): BattleState | undefined {
@@ -74,15 +100,29 @@ export function initBattle(
     equipSpd += (itemDef.stats.speed ?? 0) * mult;
   }
 
+  // Set bonuses (% based)
+  const equippedIds = Object.values(saveData.equippedItems).filter(Boolean) as string[];
+  const { statMods, actives: setActives } = calculateSetBonuses(equippedIds);
+
+  let baseHp = character.baseStats.maxHp + levelBonus * 15 + equipHp;
+  let baseMp = character.baseStats.maxMp + levelBonus * 5 + equipMp;
+  let baseAtk = character.baseStats.attack + levelBonus * 3 + equipAtk;
+  let baseDef = character.baseStats.defense + levelBonus * 2 + equipDef;
+
+  baseHp = Math.round(baseHp * (1 + statMods.hpPercent / 100));
+  baseMp = Math.round(baseMp * (1 + statMods.mpPercent / 100));
+  baseAtk = Math.round(baseAtk * (1 + statMods.atkPercent / 100));
+  baseDef = Math.round(baseDef * (1 + statMods.defPercent / 100));
+
   const player: BattleFighter = {
     id: 'player',
     name: saveData.playerName,
-    currentHp: character.baseStats.maxHp + levelBonus * 15 + equipHp,
-    maxHp: character.baseStats.maxHp + levelBonus * 15 + equipHp,
-    currentMp: character.baseStats.maxMp + levelBonus * 5 + equipMp,
-    maxMp: character.baseStats.maxMp + levelBonus * 5 + equipMp,
-    attack: character.baseStats.attack + levelBonus * 3 + equipAtk,
-    defense: character.baseStats.defense + levelBonus * 2 + equipDef,
+    currentHp: baseHp,
+    maxHp: baseHp,
+    currentMp: baseMp,
+    maxMp: baseMp,
+    attack: baseAtk,
+    defense: baseDef,
     speed: character.baseStats.speed + levelBonus * 1 + equipSpd,
     statusEffects: [],
     isAlive: true,
@@ -150,9 +190,10 @@ export function initBattle(
   skillStateStore.set(battleState.id, skillStates);
   battleDungeonMap.set(battleState.id, dungeonId);
   battleCritMap.set(battleState.id, {
-    critRate: character.baseStats.critRate + equipCritRate,
-    critDamage: character.baseStats.critDamage + equipCritDmg,
+    critRate: character.baseStats.critRate + equipCritRate + statMods.critRateFlat,
+    critDamage: (character.baseStats.critDamage + equipCritDmg) * (1 + statMods.critDmgPercent / 100),
   });
+  battleSetActiveMap.set(battleState.id, setActives);
   battleWaveMap.set(battleState.id, {
     current: waveIndex,
     total: dungeon.waves.length,
@@ -324,8 +365,30 @@ export function executePlayerAction(
     // Damage (with buff effects)
     if (skill.damageMultiplier > 0 && target.id !== 'player') {
       damage = calculateDamage(getEffectiveAttack(player), getEffectiveDefense(target), skill.damageMultiplier, isCrit, baseCritDmg);
+
+      // Set active: bonus_damage (추가 피해)
+      const setActives = battleSetActiveMap.get(battleState.id) ?? [];
+      for (const sa of setActives) {
+        if (sa && sa.type === 'bonus_damage' && Math.random() < (sa.chance ?? 0)) {
+          const bonusDmg = Math.round(damage * sa.value / 100);
+          damage += bonusDmg;
+          battleState.log.push({ turn: battleState.turn, message: `[세트 효과] 추가 피해 ${bonusDmg}!`, type: 'buff' });
+        }
+      }
+
       target.currentHp = Math.max(0, target.currentHp - damage);
       target.isAlive = target.currentHp > 0;
+
+      // Set active: lifesteal_on_crit (크리 흡혈)
+      if (isCrit) {
+        for (const sa of setActives) {
+          if (sa && sa.type === 'lifesteal_on_crit') {
+            const stolen = Math.round(damage * sa.value / 100);
+            player.currentHp = Math.min(player.maxHp, player.currentHp + stolen);
+            battleState.log.push({ turn: battleState.turn, message: `[세트 효과] 생명력 ${stolen} 흡수!`, type: 'heal' });
+          }
+        }
+      }
     }
 
     // Heal
@@ -459,6 +522,19 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
     player.currentHp = Math.max(0, player.currentHp - damage);
     player.isAlive = player.currentHp > 0;
 
+    // Set active: reflect (피해 반사)
+    if (damage > 0 && player.isAlive) {
+      const setActives = battleSetActiveMap.get(battleState.id) ?? [];
+      for (const sa of setActives) {
+        if (sa && sa.type === 'reflect' && Math.random() < (sa.chance ?? 0)) {
+          const reflected = Math.round(damage * sa.value / 100);
+          enemy.currentHp = Math.max(0, enemy.currentHp - reflected);
+          enemy.isAlive = enemy.currentHp > 0;
+          battleState.log.push({ turn: battleState.turn, message: `[세트 효과] 피해 ${reflected} 반사!`, type: 'buff' });
+        }
+      }
+    }
+
     let statusApplied: string | null = null;
     if (chosen.statusEffect) {
       player.statusEffects.push({
@@ -509,9 +585,29 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
     }
   }
 
-  // MP natural recovery (3% of max per turn)
+  // MP natural recovery (3% of max per turn) + set active bonuses
   if (player.isAlive) {
-    const mpRecovery = Math.max(1, Math.floor(player.maxMp * 0.03));
+    const setActives = battleSetActiveMap.get(battleState.id) ?? [];
+    let bonusHpRegen = 0;
+    let bonusMpRegen = 0;
+    for (const sa of setActives) {
+      if (sa?.type === 'hp_regen_per_turn') bonusHpRegen += sa.value;
+      if (sa?.type === 'mp_regen_per_turn') bonusMpRegen += sa.value;
+    }
+
+    // HP regen from set
+    if (bonusHpRegen > 0) {
+      const hpHeal = Math.max(1, Math.floor(player.maxHp * bonusHpRegen / 100));
+      const hpBefore = player.currentHp;
+      player.currentHp = Math.min(player.maxHp, player.currentHp + hpHeal);
+      if (player.currentHp > hpBefore) {
+        battleState.log.push({ turn: battleState.turn, message: `[세트 효과] HP ${player.currentHp - hpBefore} 회복`, type: 'heal' });
+      }
+    }
+
+    // MP recovery (base 3% + set bonus)
+    const mpPercent = 3 + bonusMpRegen;
+    const mpRecovery = Math.max(1, Math.floor(player.maxMp * mpPercent / 100));
     const before = player.currentMp;
     player.currentMp = Math.min(player.maxMp, player.currentMp + mpRecovery);
     if (player.currentMp > before) {
@@ -803,6 +899,7 @@ export function removeBattle(id: string): void {
   skillStateStore.delete(id);
   battleDungeonMap.delete(id);
   battleCritMap.delete(id);
+  battleSetActiveMap.delete(id);
   battleWaveMap.delete(id);
   abyssFloorMap.delete(id);
 }
@@ -861,15 +958,29 @@ export function initAbyssBattle(
     equipCritDmg += (itemDef.stats.critDamage ?? 0) * mult;
   }
 
+  // Set bonuses
+  const equippedIds = Object.values(saveData.equippedItems).filter(Boolean) as string[];
+  const { statMods, actives: setActives } = calculateSetBonuses(equippedIds);
+
+  let baseHp = character.baseStats.maxHp + levelBonus * 15 + equipHp;
+  let baseMp = character.baseStats.maxMp + levelBonus * 5 + equipMp;
+  let baseAtk = character.baseStats.attack + levelBonus * 3 + equipAtk;
+  let baseDef = character.baseStats.defense + levelBonus * 2 + equipDef;
+
+  baseHp = Math.round(baseHp * (1 + statMods.hpPercent / 100));
+  baseMp = Math.round(baseMp * (1 + statMods.mpPercent / 100));
+  baseAtk = Math.round(baseAtk * (1 + statMods.atkPercent / 100));
+  baseDef = Math.round(baseDef * (1 + statMods.defPercent / 100));
+
   const player: BattleFighter = {
     id: 'player',
     name: saveData.playerName,
-    currentHp: character.baseStats.maxHp + levelBonus * 15 + equipHp,
-    maxHp: character.baseStats.maxHp + levelBonus * 15 + equipHp,
-    currentMp: character.baseStats.maxMp + levelBonus * 5 + equipMp,
-    maxMp: character.baseStats.maxMp + levelBonus * 5 + equipMp,
-    attack: character.baseStats.attack + levelBonus * 3 + equipAtk,
-    defense: character.baseStats.defense + levelBonus * 2 + equipDef,
+    currentHp: baseHp,
+    maxHp: baseHp,
+    currentMp: baseMp,
+    maxMp: baseMp,
+    attack: baseAtk,
+    defense: baseDef,
     speed: character.baseStats.speed + levelBonus * 1 + equipSpd,
     statusEffects: [],
     isAlive: true,
@@ -941,9 +1052,10 @@ export function initAbyssBattle(
   skillStateStore.set(battleState.id, skillStates);
   battleDungeonMap.set(battleState.id, '__abyss__');
   battleCritMap.set(battleState.id, {
-    critRate: character.baseStats.critRate + equipCritRate,
-    critDamage: character.baseStats.critDamage + equipCritDmg,
+    critRate: character.baseStats.critRate + equipCritRate + statMods.critRateFlat,
+    critDamage: (character.baseStats.critDamage + equipCritDmg) * (1 + statMods.critDmgPercent / 100),
   });
+  battleSetActiveMap.set(battleState.id, setActives);
   abyssFloorMap.set(battleState.id, floor);
 
   return { battleState, skillStates, floor };

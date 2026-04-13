@@ -142,31 +142,31 @@ export const EQUIP_ASSASSIN: Item[] = [
   {
     id: 'as_rar_chest_01', name: '황무지방랑자 튜닉', description: '도적 던전 영웅 세트인 황무지방랑자의 가슴 방어구입니다.',
     type: 'chest', rarity: 'rare', iconUrl: '/assets/items/inv_chest_leather_03.svg',
-    stackable: false, maxStack: 1, sellPrice: 900, requiredClass: 'assassin',
+    stackable: false, maxStack: 1, sellPrice: 900, setId: 'set_as_wastewanderer', requiredClass: 'assassin',
     stats: { defense: 60, hp: 60, attack: 40, critRate: 0.04 }
   },
   {
     id: 'as_rar_legs_01', name: '황무지방랑자 다리보호구', description: '적의 추적을 따돌리기 좋은 가벼운 다리 방어구입니다.',
     type: 'legs', rarity: 'rare', iconUrl: '/assets/items/inv_pants_leather_03.svg',
-    stackable: false, maxStack: 1, sellPrice: 850, requiredClass: 'assassin',
+    stackable: false, maxStack: 1, sellPrice: 850, setId: 'set_as_wastewanderer', requiredClass: 'assassin',
     stats: { defense: 55, hp: 55, attack: 35, critRate: 0.03 }
   },
   {
     id: 'as_rar_helm_01', name: '황무지방랑자 복면', description: '마치 모래폭풍과 동화되는 듯한 느낌을 줍니다.',
     type: 'helm', rarity: 'rare', iconUrl: '/assets/items/inv_helmet_21.svg',
-    stackable: false, maxStack: 1, sellPrice: 800, requiredClass: 'assassin',
+    stackable: false, maxStack: 1, sellPrice: 800, setId: 'set_as_wastewanderer', requiredClass: 'assassin',
     stats: { defense: 50, hp: 45, attack: 30, critDamage: 0.1 }
   },
   {
     id: 'as_rar_shoulders_01', name: '황무지방랑자 어깨보호대', description: '어깨 위로 가시가 돋아있어 접근하는 적을 위협합니다.',
     type: 'shoulders', rarity: 'rare', iconUrl: '/assets/items/inv_shoulder_19.svg',
-    stackable: false, maxStack: 1, sellPrice: 780, requiredClass: 'assassin',
+    stackable: false, maxStack: 1, sellPrice: 780, setId: 'set_as_wastewanderer', requiredClass: 'assassin',
     stats: { defense: 45, hp: 40, attack: 25 }
   },
   {
     id: 'as_rar_gloves_01', name: '황무지방랑자 장갑', description: '기습과 맹독 공격의 정확도를 높여주는 장갑입니다.',
     type: 'gloves', rarity: 'rare', iconUrl: '/assets/items/inv_gauntlets_13.svg',
-    stackable: false, maxStack: 1, sellPrice: 700, requiredClass: 'assassin',
+    stackable: false, maxStack: 1, sellPrice: 700, setId: 'set_as_wastewanderer', requiredClass: 'assassin',
     stats: { defense: 35, hp: 35, attack: 20, critRate: 0.02 }
   },
   {
@@ -254,13 +254,13 @@ export const EQUIP_ASSASSIN: Item[] = [
   {
     id: 'leg_warglaive_mh_rogue', name: '아지노스의 전투검 (주장비)', description: '일리단의 무기로, 쌍수 도적에게 있어 완전한 로망이자 종결 무기입니다.',
     type: 'weapon', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_01.svg',
-    stackable: false, maxStack: 1, sellPrice: 60000, requiredClass: 'assassin',
+    stackable: false, maxStack: 1, sellPrice: 60000, setId: 'set_as_warglaive', requiredClass: 'assassin',
     stats: { attack: 250, critRate: 0.15, critDamage: 0.3 }
   },
   {
     id: 'leg_warglaive_oh_rogue', name: '아지노스의 전투검 (보조장비)', description: '주장비와 결합할 때 비로소 진정한 파괴력을 내뿜습니다.',
     type: 'offhand', rarity: 'legendary', iconUrl: '/assets/items/inv_weapon_glave_02.svg',
-    stackable: false, maxStack: 1, sellPrice: 60000, requiredClass: 'assassin',
+    stackable: false, maxStack: 1, sellPrice: 60000, setId: 'set_as_warglaive', requiredClass: 'assassin',
     stats: { attack: 220, critRate: 0.1, critDamage: 0.2 }
   },
   {
