@@ -166,6 +166,25 @@ export function initBattle(
 // calculateDamage
 // ────────────────────────────────────────────────────────────
 
+/** Get effective attack considering attack_up buffs */
+function getEffectiveAttack(fighter: BattleFighter): number {
+  let atk = fighter.attack;
+  for (const eff of fighter.statusEffects) {
+    if (eff.type === 'attack_up') atk += eff.value;
+  }
+  return atk;
+}
+
+/** Get effective defense considering defense_up buffs and shield */
+function getEffectiveDefense(fighter: BattleFighter): number {
+  let def = fighter.defense;
+  for (const eff of fighter.statusEffects) {
+    if (eff.type === 'defense_up') def += eff.value;
+    if (eff.type === 'shield') def += eff.value;
+  }
+  return def;
+}
+
 export function calculateDamage(
   attackerAtk: number,
   defenderDef: number,
@@ -246,10 +265,10 @@ export function executePlayerAction(
   const { player } = battleState;
   if (!player.isAlive) return { error: 'Player is defeated' };
 
-  // Check stun
+  // Check stun — skip turn but return as success so client knows
   if (player.statusEffects.some((e) => e.type === 'stun')) {
     player.statusEffects = player.statusEffects.filter((e) => e.type !== 'stun');
-    battleState.log.push({ turn: battleState.turn, message: `${player.name}은(는) 기절 상태라 행동할 수 없다!`, type: 'system' });
+    battleState.log.push({ turn: battleState.turn, message: `[기절] ${player.name}은(는) 기절에서 벗어났다! (이번 턴 행동 불가)`, type: 'debuff' });
     battleState.status = 'enemy_turn';
     return { results: [] };
   }
@@ -301,9 +320,9 @@ export function executePlayerAction(
     let damage = 0;
     let heal = 0;
 
-    // Damage
+    // Damage (with buff effects)
     if (skill.damageMultiplier > 0 && target.id !== 'player') {
-      damage = calculateDamage(player.attack, target.defense, skill.damageMultiplier, isCrit, baseCritDmg);
+      damage = calculateDamage(getEffectiveAttack(player), getEffectiveDefense(target), skill.damageMultiplier, isCrit, baseCritDmg);
       target.currentHp = Math.max(0, target.currentHp - damage);
       target.isAlive = target.currentHp > 0;
     }
@@ -389,7 +408,10 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
   const results: BattleResult[] = [];
   const { player } = battleState;
 
-  for (const enemy of battleState.enemies) {
+  // Sort enemies by speed (fastest acts first)
+  const sortedEnemies = [...battleState.enemies].sort((a, b) => b.speed - a.speed);
+
+  for (const enemy of sortedEnemies) {
     if (!enemy.isAlive) continue;
     if (!player.isAlive) break;
 
@@ -432,7 +454,7 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
       }
     }
 
-    const damage = calculateDamage(enemy.attack, player.defense, chosen.damageMultiplier, false);
+    const damage = calculateDamage(getEffectiveAttack(enemy), getEffectiveDefense(player), chosen.damageMultiplier, false);
     player.currentHp = Math.max(0, player.currentHp - damage);
     player.isAlive = player.currentHp > 0;
 
@@ -483,6 +505,20 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
   if (ssArr) {
     for (const ss of ssArr) {
       if (ss.currentCooldown > 0) ss.currentCooldown -= 1;
+    }
+  }
+
+  // MP natural recovery (3% of max per turn)
+  if (player.isAlive) {
+    const mpRecovery = Math.max(1, Math.floor(player.maxMp * 0.03));
+    const before = player.currentMp;
+    player.currentMp = Math.min(player.maxMp, player.currentMp + mpRecovery);
+    if (player.currentMp > before) {
+      battleState.log.push({
+        turn: battleState.turn,
+        message: `MP가 ${player.currentMp - before} 회복되었다. (${player.currentMp}/${player.maxMp})`,
+        type: 'heal',
+      });
     }
   }
 
