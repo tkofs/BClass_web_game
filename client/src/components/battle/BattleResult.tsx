@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import { ITEMS } from '@shared/data';
@@ -36,6 +36,28 @@ const BattleResult = React.memo(function BattleResult({
   const handleRetry = useCallback(() => onRetry(), [onRetry]);
   const handleHome = useCallback(() => onHome(), [onHome]);
   const handleNextFloor = useCallback(() => onNextFloor?.(), [onNextFloor]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (isAbyss) {
+          handleNextFloor();
+        } else if (isVictory) {
+          handleContinue();
+        } else {
+          handleRetry();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleHome();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, isAbyss, isVictory, handleNextFloor, handleContinue, handleRetry, handleHome]);
 
   return (
     <Modal
