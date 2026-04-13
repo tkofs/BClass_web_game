@@ -104,16 +104,10 @@ function BattleScreen() {
   useEffect(() => {
     if (battleState) {
       const firstAlive = battleState.enemies.find((e) => e.isAlive);
-      if (firstAlive && !selectedTargetId) {
-        setSelectedTargetId(firstAlive.id);
-      }
-      // 현재 타겟이 죽었으면 다음 살아있는 적 선택
-      if (selectedTargetId) {
-        const currentTarget = battleState.enemies.find((e) => e.id === selectedTargetId);
-        if (currentTarget && !currentTarget.isAlive) {
-          const nextAlive = battleState.enemies.find((e) => e.isAlive);
-          setSelectedTargetId(nextAlive?.id ?? null);
-        }
+
+      // 타겟이 없거나, 현재 타겟이 적 목록에 없거나, 죽었으면 재선택
+      if (!selectedTargetId || !battleState.enemies.find((e) => e.id === selectedTargetId && e.isAlive)) {
+        setSelectedTargetId(firstAlive?.id ?? null);
       }
     }
   }, [battleState, selectedTargetId]);
