@@ -13,10 +13,12 @@ import type { BattleFighter } from '@shared/types';
 const EnemyCard = React.memo(function EnemyCard({
   enemy,
   isSelected,
+  isFlashing,
   onSelect,
 }: {
   enemy: BattleFighter;
   isSelected: boolean;
+  isFlashing: boolean;
   onSelect: (id: string) => void;
 }) {
   const handleClick = useCallback(() => {
@@ -34,7 +36,7 @@ const EnemyCard = React.memo(function EnemyCard({
           : isSelected
             ? 'border-dungeon-health shadow-md shadow-dungeon-health/20'
             : 'hover:border-dungeon-accent/50 cursor-pointer'
-      }`}
+      } ${isFlashing ? 'animate-pulse bg-red-900/30' : ''}`}
     >
       <div className="w-14 h-14 mx-auto bg-dungeon-bg rounded-lg mb-2 flex items-center justify-center">
         <span className={`text-2xl ${enemy.isAlive ? 'text-dungeon-health' : 'text-gray-700'}`}>
@@ -78,6 +80,9 @@ function BattleScreen() {
   const isAbyssMode = dungeonId === 'abyss';
 
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [flashEnemies, setFlashEnemies] = useState<Set<string>>(new Set());
+  const [healFlash, setHealFlash] = useState(false);
+  const [skillText, setSkillText] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll battle log
@@ -144,12 +149,42 @@ function BattleScreen() {
         if (targetId !== selectedTargetId) setSelectedTargetId(targetId);
       }
 
+      const prevLogLen = useCombatStore.getState().battleLog.length;
+
       const result = isAbyssMode
         ? await useAbyssSkill(skillId, targetId)
         : await useSkill(skillId, targetId);
 
       if (result?.saveData) {
         updateSaveData(result.saveData);
+      }
+
+      // Show skill name floating text
+      setSkillText(skill.name);
+      setTimeout(() => setSkillText(null), 800);
+
+      // Check new log entries for damage/heal
+      const newLog = useCombatStore.getState().battleLog;
+      const newEntries = newLog.slice(prevLogLen);
+
+      const hasDamage = newEntries.some((e) => e.type === 'damage');
+      const hasHeal = newEntries.some((e) => e.type === 'heal');
+
+      if (hasDamage) {
+        // Flash all enemies that were targeted
+        const hitIds = new Set<string>();
+        if (skill.targetType === 'all_enemies' && result?.battleState) {
+          result.battleState.enemies.forEach((e) => hitIds.add(e.id));
+        } else if (targetId !== 'player') {
+          hitIds.add(targetId);
+        }
+        setFlashEnemies(hitIds);
+        setTimeout(() => setFlashEnemies(new Set()), 300);
+      }
+
+      if (hasHeal) {
+        setHealFlash(true);
+        setTimeout(() => setHealFlash(false), 300);
       }
     },
     [selectedTargetId, useSkill, useAbyssSkill, isAbyssMode, updateSaveData],
@@ -234,6 +269,7 @@ function BattleScreen() {
             key={enemy.id}
             enemy={enemy}
             isSelected={selectedTargetId === enemy.id}
+            isFlashing={flashEnemies.has(enemy.id)}
             onSelect={handleTargetSelect}
           />
         ))}
@@ -256,7 +292,7 @@ function BattleScreen() {
       </div>
 
       {/* Player stats */}
-      <div className="panel mb-3">
+      <div className={`panel mb-3 transition-colors duration-300 ${healFlash ? 'bg-green-900/20' : ''}`}>
         <div className="flex items-center gap-4 mb-2">
           <span className="font-bold text-sm">{battleState.player.name}</span>
           {battleState.player.statusEffects.map((eff, i) => (
@@ -324,6 +360,13 @@ function BattleScreen() {
           </div>
         );
       })()}
+
+      {/* Skill name floating text */}
+      {skillText && (
+        <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+          <span className="text-3xl font-bold text-white animate-bounce opacity-80">{skillText}</span>
+        </div>
+      )}
 
       {/* Result modal */}
       <BattleResult
