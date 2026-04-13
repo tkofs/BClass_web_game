@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCombat } from '@/hooks/useCombat';
+import { useCombatStore } from '@/stores/combatStore';
 import { useAuth } from '@/hooks/useAuth';
 import { SKILLS, ITEMS } from '@shared/data';
 import StatBar from '@/components/common/StatBar';
@@ -122,22 +123,21 @@ function BattleScreen() {
 
   const handleSkillSelect = useCallback(
     async (skillId: string) => {
-      // 기본 검증: 내 턴 + 애니메이션 중 아님
-      if (!battleState || battleState.status !== 'player_turn') return;
-      if (isAnimating) return;
+      // 항상 스토어에서 최신 상태를 가져옴 (클로저 문제 방지)
+      const state = useCombatStore.getState();
+      const currentBattle = state.battleState;
+      if (!currentBattle || currentBattle.status !== 'player_turn') return;
+      if (state.isAnimating) return;
 
       const skill = SKILLS.find((s) => s.id === skillId);
       if (!skill || skill.type === 'passive') return;
 
-      // 타겟 결정: 항상 살아있는 적 중에서 선택
       let targetId: string;
       if (skill.targetType === 'self' || skill.targetType === 'all_enemies' || skill.targetType === 'all_allies') {
         targetId = 'player';
       } else {
-        // 현재 선택된 타겟이 살아있으면 사용, 아니면 첫 살아있는 적
-        const aliveEnemies = battleState.enemies.filter((e) => e.isAlive);
-        const validTarget = aliveEnemies.find((e) => e.id === selectedTargetId);
-        const target = validTarget ?? aliveEnemies[0];
+        const aliveEnemies = currentBattle.enemies.filter((e) => e.isAlive);
+        const target = aliveEnemies.find((e) => e.id === selectedTargetId) ?? aliveEnemies[0];
         if (!target) return;
         targetId = target.id;
         if (targetId !== selectedTargetId) setSelectedTargetId(targetId);
@@ -151,7 +151,7 @@ function BattleScreen() {
         updateSaveData(result.saveData);
       }
     },
-    [battleState, isAnimating, selectedTargetId, useSkill, useAbyssSkill, isAbyssMode, updateSaveData],
+    [selectedTargetId, useSkill, useAbyssSkill, isAbyssMode, updateSaveData],
   );
 
   const handleContinue = useCallback(() => {
