@@ -927,16 +927,59 @@ export function calculateAbyssRewards(battleId: string, characterId: string): Ba
     }
   }
 
-  // Equipment drops - legendary only
+  // Equipment drops
   for (const enemy of battleState.enemies) {
-    const isBoss = isBossFloor; // all enemies on boss floor count as boss
-    const dropRate = isBoss ? 1.0 : abyssDropRate(floor);
+    if (isBossFloor) {
+      // Boss: 100% legendary
+      const equipId = rollEquipment(characterId, 'legendary');
+      if (equipId) addDrop(equipId);
+      continue;
+    }
 
-    if (Math.random() < dropRate) {
+    // Roll 1: common~epic (60% flat, rarity by floor-based weights)
+    if (Math.random() < 0.60) {
+      const rarity = rollAbyssNormalRarity(floor);
+      if (rarity) {
+        const equipId = rollEquipment(characterId, rarity);
+        if (equipId) addDrop(equipId);
+      }
+    }
+
+    // Roll 2: legendary (independent)
+    if (Math.random() < abyssDropRate(floor)) {
       const equipId = rollEquipment(characterId, 'legendary');
       if (equipId) addDrop(equipId);
     }
   }
 
   return { exp: totalExp, gold: totalGold, items };
+}
+
+/** Roll rarity for abyss normal drop (common~epic, floor-dependent) */
+function rollAbyssNormalRarity(floor: number): string | null {
+  type WeightEntry = { rarity: string; weight: number };
+  const weights: WeightEntry[] = [];
+
+  if (floor < 100) weights.push({ rarity: 'common', weight: 50 });
+  if (floor < 200) weights.push({ rarity: 'uncommon', weight: floor < 100 ? 30 : 45 });
+  if (floor < 300) {
+    if (floor < 100) weights.push({ rarity: 'rare', weight: 15 });
+    else if (floor < 200) weights.push({ rarity: 'rare', weight: 40 });
+    else weights.push({ rarity: 'rare', weight: 55 });
+  }
+  // epic always available
+  if (floor < 100) weights.push({ rarity: 'epic', weight: 5 });
+  else if (floor < 200) weights.push({ rarity: 'epic', weight: 15 });
+  else if (floor < 300) weights.push({ rarity: 'epic', weight: 45 });
+  else weights.push({ rarity: 'epic', weight: 100 });
+
+  const total = weights.reduce((s, w) => s + w.weight, 0);
+  if (total === 0) return null;
+
+  let roll = Math.random() * total;
+  for (const w of weights) {
+    roll -= w.weight;
+    if (roll <= 0) return w.rarity;
+  }
+  return weights[weights.length - 1].rarity;
 }
