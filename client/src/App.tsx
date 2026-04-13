@@ -9,6 +9,8 @@ import BattleScreen from './components/battle/BattleScreen';
 import InventoryScreen from './components/inventory/InventoryScreen';
 import BestiaryScreen from './components/bestiary/BestiaryScreen';
 import ShopScreen from './components/shop/ShopScreen';
+import AchievementScreen from './components/achievement/AchievementScreen';
+import SkillScreen from './components/skills/SkillScreen';
 
 function App() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
@@ -27,6 +29,8 @@ function App() {
       <Route path="/inventory" element={<InventoryScreen />} />
       <Route path="/bestiary" element={<BestiaryScreen />} />
       <Route path="/shop" element={<ShopScreen />} />
+      <Route path="/achievements" element={<AchievementScreen />} />
+      <Route path="/skills" element={<SkillScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -5,6 +5,7 @@ import { useGameStore } from '@/stores/gameStore';
 import { CHARACTERS, ITEMS } from '@shared/data';
 import Card from '@/components/common/Card';
 import StatBar from '@/components/common/StatBar';
+import axios from 'axios';
 
 function formatSaveCode(code: string): string {
   return code.replace(/(.{4})/g, '$1-').replace(/-$/, '');
@@ -43,9 +44,11 @@ function StatPercent({ label, base, equip, color }: { label: string; base: numbe
 
 function HomeScreen() {
   const navigate = useNavigate();
-  const { saveCode, saveData, isAuthenticated, logout } = useAuth();
+  const { saveCode, saveData, isAuthenticated, logout, updateSaveData } = useAuth();
   const { loadGameData } = useGameStore();
   const [copied, setCopied] = useState(false);
+  const [dailyStatus, setDailyStatus] = useState<{ canClaim: boolean; reward: { gold: number; description: string } } | null>(null);
+  const [dailyClaimed, setDailyClaimed] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -53,6 +56,9 @@ function HomeScreen() {
       return;
     }
     loadGameData();
+    axios.get('/api/daily/status').then((res) => {
+      if (res.data) setDailyStatus(res.data);
+    }).catch(() => {});
   }, [isAuthenticated, navigate, loadGameData]);
 
   const character = useMemo(
@@ -110,6 +116,21 @@ function HomeScreen() {
   const handleInventory = useCallback(() => navigate('/inventory'), [navigate]);
   const handleBestiary = useCallback(() => navigate('/bestiary'), [navigate]);
   const handleShop = useCallback(() => navigate('/shop'), [navigate]);
+  const handleSkills = useCallback(() => navigate('/skills'), [navigate]);
+  const handleAchievements = useCallback(() => navigate('/achievements'), [navigate]);
+
+  const handleClaimDaily = useCallback(async () => {
+    try {
+      const res = await axios.post('/api/daily/claim');
+      if (res.data.success && res.data.saveData) {
+        updateSaveData(res.data.saveData);
+        setDailyClaimed(true);
+        setDailyStatus((prev) => prev ? { ...prev, canClaim: false } : null);
+      }
+    } catch {
+      alert('보상 수령에 실패했습니다.');
+    }
+  }, [updateSaveData]);
 
   if (!saveData || !character || !baseStats) return null;
 
@@ -127,6 +148,26 @@ function HomeScreen() {
           로그아웃
         </button>
       </div>
+
+      {/* Daily reward banner */}
+      {dailyStatus && (
+        dailyStatus.canClaim && !dailyClaimed ? (
+          <div className="mb-4 p-3 rounded-lg border-2 border-yellow-500 bg-yellow-500/10 text-center">
+            <p className="text-yellow-400 font-bold text-sm mb-2">
+              일일 보상 수령 가능! ({dailyStatus.reward.description})
+            </p>
+            <button
+              type="button"
+              onClick={handleClaimDaily}
+              className="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-bold transition-colors"
+            >
+              받기
+            </button>
+          </div>
+        ) : (
+          <p className="text-center text-gray-600 text-xs mb-4">오늘의 보상 수령 완료</p>
+        )
+      )}
 
       {/* Character portrait */}
       <div className="flex flex-col items-center mb-6">
@@ -180,7 +221,7 @@ function HomeScreen() {
       </Card>
 
       {/* Menu buttons */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Card hover onClick={handleDungeon} className="text-center py-8">
           <div className="text-3xl mb-2 text-red-400">&#9876;</div>
           <p className="text-lg font-bold">던전</p>
@@ -193,8 +234,18 @@ function HomeScreen() {
         </Card>
         <Card hover onClick={handleInventory} className="text-center py-8">
           <div className="text-3xl mb-2 text-yellow-400">&#9776;</div>
-          <p className="text-lg font-bold">장비 & 가방</p>
+          <p className="text-lg font-bold">장비&가방</p>
           <p className="text-xs text-gray-500 mt-1">장비를 관리하세요</p>
+        </Card>
+        <Card hover onClick={handleSkills} className="text-center py-8">
+          <div className="text-3xl mb-2 text-cyan-400">&#9884;</div>
+          <p className="text-lg font-bold">스킬</p>
+          <p className="text-xs text-gray-500 mt-1">스킬을 강화하세요</p>
+        </Card>
+        <Card hover onClick={handleAchievements} className="text-center py-8">
+          <div className="text-3xl mb-2 text-orange-400">&#127942;</div>
+          <p className="text-lg font-bold">업적</p>
+          <p className="text-xs text-gray-500 mt-1">업적을 확인하세요</p>
         </Card>
         <Card hover onClick={handleBestiary} className="text-center py-8">
           <div className="text-3xl mb-2 text-dungeon-accent">&#9733;</div>

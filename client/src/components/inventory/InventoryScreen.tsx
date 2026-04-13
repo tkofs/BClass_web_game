@@ -313,13 +313,24 @@ function EquippedDetailModal({
   onClose,
   slot,
   onUnequip,
+  gold,
+  onGoldEnhance,
 }: {
   isOpen: boolean;
   onClose: () => void;
   slot: EquippedSlotInfo | null;
   onUnequip: (slotName: string) => void;
+  gold: number;
+  onGoldEnhance: (itemId: string) => void;
 }) {
   if (!slot?.data) return null;
+
+  const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000 };
+  const target = slot.enhanceLevel + 1;
+  const enhanceCostGold = (RARITY_BASE[slot.data.rarity] ?? 1000) * target * target;
+  const enhanceRate = target <= 5 ? 50 : Math.max(5, 50 - (target - 5) * 1.5);
+  const canEnhance = slot.enhanceLevel < 99;
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={slot.data.name}>
       <div className="space-y-3">
@@ -332,6 +343,30 @@ function EquippedDetailModal({
         </div>
         <p className="text-sm text-gray-300">{slot.data.description}</p>
         <ItemStatsDisplay item={slot.data} enhanceLevel={slot.enhanceLevel} />
+
+        {/* Gold enhance */}
+        {canEnhance && (
+          <div className="panel p-2 text-center space-y-1">
+            <p className="text-xs text-gray-400">골드 강화 (+{slot.enhanceLevel} &rarr; +{target})</p>
+            <p className="text-sm">
+              <span className="text-yellow-400 font-bold">{enhanceCostGold.toLocaleString()}G</span>
+              <span className="text-gray-500 mx-2">|</span>
+              <span className={`font-bold ${enhanceRate >= 50 ? 'text-green-400' : enhanceRate >= 20 ? 'text-yellow-400' : 'text-red-400'}`}>
+                성공률 {enhanceRate.toFixed(1)}%
+              </span>
+            </p>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={gold < enhanceCostGold}
+              onClick={() => onGoldEnhance(slot.data!.id)}
+              className="w-full"
+            >
+              {gold < enhanceCostGold ? 'Gold 부족' : '골드 강화'}
+            </Button>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Button
             variant="danger"
@@ -901,6 +936,30 @@ function InventoryScreen() {
         onClose={handleCloseEquipped}
         slot={selectedEquipSlot}
         onUnequip={handleUnequip}
+        gold={totalGold}
+        onGoldEnhance={async (itemId) => {
+          try {
+            const res = await axios.post('/api/inventory/enhance-gold', { itemId });
+            if (res.data.success) {
+              updateSaveData(res.data.saveData);
+              if (res.data.enhanced) {
+                alert(`강화 성공! (${res.data.goldSpent.toLocaleString()}G 소모)`);
+              } else {
+                alert(`강화 실패... (${res.data.goldSpent.toLocaleString()}G 소모)`);
+              }
+              // Re-select to refresh info
+              if (res.data.saveData) {
+                setSelectedEquipSlot((prev) => {
+                  if (!prev) return null;
+                  const newLevel = res.data.saveData.enhanceLevels?.[prev.itemId ?? '']?.level ?? prev.enhanceLevel;
+                  return { ...prev, enhanceLevel: newLevel };
+                });
+              }
+            }
+          } catch (err: any) {
+            alert(err.response?.data?.message || '강화 실패');
+          }
+        }}
       />
 
       <EquipSelectModal
