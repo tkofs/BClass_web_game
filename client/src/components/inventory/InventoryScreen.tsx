@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useInventory } from '@/hooks/useInventory';
 import type { ResolvedItem, EquippedSlotInfo } from '@/hooks/useInventory';
 import type { Item } from '@shared/types';
+import { ITEMS, SETS, CHARACTERS } from '@shared/data';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
@@ -647,6 +648,101 @@ function InventoryScreen() {
               ))}
             </div>
           </Card>
+
+          {/* Total stats + Set bonuses */}
+          {(() => {
+            const equippedIds = equippedSlots.map((s) => s.itemId).filter(Boolean) as string[];
+            const character = CHARACTERS.find((c) => c.id === saveData?.characterId);
+            if (!character || !saveData) return null;
+
+            // Base + equip stats
+            const levelBonus = saveData.level - 1;
+            let totalAtk = character.baseStats.attack + levelBonus * 3;
+            let totalDef = character.baseStats.defense + levelBonus * 2;
+            let totalHp = character.baseStats.maxHp + levelBonus * 15;
+            let totalMp = character.baseStats.maxMp + levelBonus * 5;
+            let totalSpd = character.baseStats.speed + levelBonus * 1;
+            let totalCrit = character.baseStats.critRate;
+            let totalCritDmg = character.baseStats.critDamage;
+
+            for (const id of equippedIds) {
+              const item = ITEMS.find((i) => i.id === id);
+              if (!item?.stats) continue;
+              const mult = 1 + (saveData.enhanceLevels?.[id]?.level ?? 0);
+              totalAtk += (item.stats.attack ?? 0) * mult;
+              totalDef += (item.stats.defense ?? 0) * mult;
+              totalHp += (item.stats.hp ?? 0) * mult;
+              totalMp += (item.stats.mp ?? 0) * mult;
+              totalSpd += (item.stats.speed ?? 0) * mult;
+              totalCrit += (item.stats.critRate ?? 0) * mult;
+              totalCritDmg += (item.stats.critDamage ?? 0) * mult;
+            }
+
+            // Set bonuses
+            const activeSets: { name: string; count: number; total: number; bonuses: { desc: string; active: boolean }[] }[] = [];
+            for (const set of SETS) {
+              const count = set.pieces.filter((p) => equippedIds.includes(p)).length;
+              if (count === 0) continue;
+              const bonuses = set.bonuses.map((b) => ({
+                desc: `(${b.requiredCount}세트) ${b.description}`,
+                active: count >= b.requiredCount,
+              }));
+              activeSets.push({ name: set.name, count, total: set.pieces.length, bonuses });
+
+              // Apply % to totals
+              for (const b of set.bonuses) {
+                if (count >= b.requiredCount && b.stats) {
+                  totalAtk = Math.round(totalAtk * (1 + (b.stats.atkPercent ?? 0) / 100));
+                  totalDef = Math.round(totalDef * (1 + (b.stats.defPercent ?? 0) / 100));
+                  totalHp = Math.round(totalHp * (1 + (b.stats.hpPercent ?? 0) / 100));
+                  totalMp = Math.round(totalMp * (1 + (b.stats.mpPercent ?? 0) / 100));
+                  totalCrit += b.stats.critRateFlat ?? 0;
+                  totalCritDmg *= (1 + (b.stats.critDmgPercent ?? 0) / 100);
+                }
+              }
+            }
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Total stats */}
+                <Card className="p-4">
+                  <h2 className="text-sm font-bold text-gray-400 mb-3">종합 전투력</h2>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex justify-between"><span className="text-gray-500">HP</span><span className="text-red-400 font-bold">{totalHp.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">MP</span><span className="text-blue-400 font-bold">{totalMp.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">공격력</span><span className="text-red-400 font-bold">{totalAtk.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">방어력</span><span className="text-blue-400 font-bold">{totalDef.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">속도</span><span className="text-green-400 font-bold">{totalSpd}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">치명타율</span><span className="text-yellow-400 font-bold">{Math.round(totalCrit * 100)}%</span></div>
+                    <div className="flex justify-between col-span-2"><span className="text-gray-500">치명타 피해</span><span className="text-purple-400 font-bold">x{totalCritDmg.toFixed(2)}</span></div>
+                  </div>
+                </Card>
+
+                {/* Set bonuses */}
+                <Card className="p-4">
+                  <h2 className="text-sm font-bold text-gray-400 mb-3">세트 효과</h2>
+                  {activeSets.length === 0 ? (
+                    <p className="text-xs text-gray-600">활성화된 세트가 없습니다</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {activeSets.map((set) => (
+                        <div key={set.name}>
+                          <p className="text-sm font-bold text-yellow-400">
+                            {set.name} <span className="text-xs text-gray-500">({set.count}/{set.total})</span>
+                          </p>
+                          {set.bonuses.map((b, i) => (
+                            <p key={i} className={`text-[11px] ml-2 ${b.active ? 'text-green-400' : 'text-gray-600'}`}>
+                              {b.active ? '\u2713 ' : '\u2717 '}{b.desc}
+                            </p>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            );
+          })()}
 
           {/* Equipment inventory */}
           <div>
