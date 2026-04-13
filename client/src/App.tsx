@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthStore } from './stores/authStore';
 import AuthScreen from './components/auth/AuthScreen';
 import CharacterSelect from './components/auth/CharacterSelect';
 import HomeScreen from './components/home/HomeScreen';
@@ -9,6 +11,12 @@ import BestiaryScreen from './components/bestiary/BestiaryScreen';
 import ShopScreen from './components/shop/ShopScreen';
 
 function App() {
+  const restoreSession = useAuthStore((s) => s.restoreSession);
+
+  useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
+
   return (
     <Routes>
       <Route path="/" element={<AuthScreen />} />

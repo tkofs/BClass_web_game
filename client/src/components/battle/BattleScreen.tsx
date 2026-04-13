@@ -227,11 +227,6 @@ function BattleScreen() {
         </div>
       )}
 
-      {/* Debug info */}
-      <div className="text-center text-[9px] text-gray-600 mb-1">
-        status: {battleState.status} | animating: {String(isAnimating)} | target: {selectedTargetId ?? 'none'}
-      </div>
-
       {/* Enemy area */}
       <div className="flex gap-3 justify-center flex-wrap mb-4">
         {battleState.enemies.map((enemy) => (

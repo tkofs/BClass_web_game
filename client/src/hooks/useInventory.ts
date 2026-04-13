@@ -125,6 +125,20 @@ export function useInventory() {
     [updateSaveData],
   );
 
+  const sellItem = useCallback(
+    async (itemId: string, quantity: number) => {
+      try {
+        const res = await axios.post<{ saveData: typeof saveData }>('/api/inventory/sell', { itemId, quantity });
+        if (res.data.saveData) {
+          updateSaveData(res.data.saveData);
+        }
+      } catch {
+        // Error handling left to UI
+      }
+    },
+    [updateSaveData],
+  );
+
   return {
     items,
     equipmentItems,
@@ -137,6 +151,7 @@ export function useInventory() {
     useItem,
     equipItem,
     unequipItem,
+    sellItem,
     SLOT_LABELS,
   };
 }

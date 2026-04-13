@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { validate } from '../middleware/validate';
 import * as AuthService from '../services/AuthService';
 import * as GameService from '../services/GameService';
+import { ITEMS } from '../../../shared/data';
 
 const router = Router();
 
@@ -114,6 +115,47 @@ router.post(
       res.json({ success: true, saveData });
     } catch (err) {
       console.error('[inventory/unequip]', err);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  },
+);
+
+// ── POST /sell ───────────────────────────────────────────────
+router.post(
+  '/sell',
+  validate([
+    { name: 'itemId', type: 'string', minLength: 1 },
+    { name: 'quantity', type: 'number', min: 1 },
+  ]),
+  (req: Request, res: Response): void => {
+    try {
+      const saveCode = extractSaveCode(req, res);
+      if (!saveCode) return;
+
+      const saveData = AuthService.getSaveData(saveCode);
+      if (!saveData) {
+        res.status(404).json({ success: false, message: 'Save data not found' });
+        return;
+      }
+
+      const { itemId, quantity } = req.body;
+      const itemDef = ITEMS.find((i) => i.id === itemId);
+      if (!itemDef) {
+        res.status(400).json({ success: false, message: 'Item not found' });
+        return;
+      }
+
+      const result = GameService.removeItem(saveData, itemId, quantity);
+      if (!result.success) {
+        res.status(400).json({ success: false, message: result.error });
+        return;
+      }
+
+      saveData.gold += itemDef.sellPrice * quantity;
+      AuthService.saveProgress(saveCode, saveData);
+      res.json({ success: true, goldEarned: itemDef.sellPrice * quantity, saveData });
+    } catch (err) {
+      console.error('[inventory/sell]', err);
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
   },

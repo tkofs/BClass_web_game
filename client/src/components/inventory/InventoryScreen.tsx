@@ -381,6 +381,7 @@ function ItemDetailModal({
   onClose,
   onUse,
   onEquip,
+  onSell,
 }: {
   item: Item | null;
   enhanceLevel: number;
@@ -389,6 +390,7 @@ function ItemDetailModal({
   onClose: () => void;
   onUse: (itemId: string) => void;
   onEquip: (itemId: string, slot: string) => void;
+  onSell: (itemId: string) => void;
 }) {
   if (!item) return null;
 
@@ -451,8 +453,6 @@ function ItemDetailModal({
           </p>
         )}
 
-        <p className="text-xs text-gray-600">판매가: {item.sellPrice} G</p>
-
         <div className="flex gap-2">
           {item.type === 'consumable' && (
             <Button variant="primary" size="sm" onClick={() => { onUse(item.id); onClose(); }} className="flex-1">
@@ -462,6 +462,11 @@ function ItemDetailModal({
           {isEquipType && (
             <Button variant="primary" size="sm" onClick={() => { onEquip(item.id, equipSlot); onClose(); }} className="flex-1">
               장착하기
+            </Button>
+          )}
+          {item.sellPrice > 0 && item.type !== 'material' && (
+            <Button variant="danger" size="sm" onClick={() => { onSell(item.id); onClose(); }} className="flex-1">
+              판매 ({item.sellPrice}G)
             </Button>
           )}
           <Button variant="secondary" size="sm" onClick={onClose} className="flex-1">
@@ -481,7 +486,7 @@ function InventoryScreen() {
   const {
     equipmentItems, nonEquipmentItems, equippedSlots,
     getEnhanceLevel, getEnhanceExp, totalGold, totalGems,
-    useItem, equipItem, unequipItem, SLOT_LABELS,
+    useItem, equipItem, unequipItem, sellItem, SLOT_LABELS,
   } = useInventory();
 
   const [tab, setTab] = useState<'equip' | 'bag'>('equip');
@@ -726,6 +731,7 @@ function InventoryScreen() {
         onClose={handleCloseItem}
         onUse={useItem}
         onEquip={handleEquip}
+        onSell={(itemId) => { sellItem(itemId, 1); }}
       />
 
       <EquippedDetailModal
