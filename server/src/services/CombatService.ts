@@ -36,6 +36,8 @@ const skillStateStore = new Map<string, SkillState[]>();
 const battleDungeonMap = new Map<string, string>();
 const battleCritMap = new Map<string, { critRate: number; critDamage: number }>();
 const battleSetActiveMap = new Map<string, SetBonus['active'][]>();
+const battlePrestigeMap = new Map<string, number>();
+const battleArtifactMap = new Map<string, Record<string, number>>();
 const battleSkillLevelMap = new Map<string, Record<string, number>>();
 const battleTalentMap = new Map<string, TalentBonuses>();
 const battleTitleMap = new Map<string, string>(); // battleId → equipped title ID
@@ -287,6 +289,8 @@ export function initBattle(
     critDamage: (character.baseStats.critDamage + equipCritDmg) * (1 + statMods.critDmgPercent / 100) * (1 + talentMods.critDmgPercent / 100),
   });
   battleSetActiveMap.set(battleState.id, setActives);
+  battlePrestigeMap.set(battleState.id, saveData.prestigeLevel ?? 0);
+  battleArtifactMap.set(battleState.id, getArtifactBonuses(saveData.artifacts));
   battleSkillLevelMap.set(battleState.id, { ...(saveData.skillLevels ?? {}) });
   battleTalentMap.set(battleState.id, talentMods);
   battleTitleMap.set(battleState.id, saveData.equippedTitle ?? '');
@@ -1000,10 +1004,13 @@ export function calculateRewards(battleId: string, characterId: string): BattleR
       }
     }
 
-    // Roll equipment drop
+    // Roll equipment drop (with prestige + artifact drop bonus)
     if (lootTable) {
       const isBoss = BOSS_IDS.has(monsterData.id);
-      const dropRate = isBoss ? BOSS_EQUIP_DROP_RATE : MOB_EQUIP_DROP_RATE;
+      const pLvl = waveData?.saveData?.prestigeLevel ?? 0;
+      const artDrop = (getArtifactBonuses(waveData?.saveData?.artifacts).dropRatePercent ?? 0) / 100;
+      const dropBonus = 1 + pLvl * 0.01 + artDrop;
+      const dropRate = isBoss ? BOSS_EQUIP_DROP_RATE : MOB_EQUIP_DROP_RATE * dropBonus;
 
       if (Math.random() < dropRate) {
         const rarity = isBoss
@@ -1033,6 +1040,18 @@ export function calculateRewards(battleId: string, characterId: string): BattleR
     }
   }
 
+  // Prestige bonuses: exp +10%, gold +5% per prestige
+  const pLevel = waveData?.saveData?.prestigeLevel ?? 0;
+  if (pLevel > 0) {
+    totalExp = Math.round(totalExp * (1 + pLevel * 0.10));
+    totalGold = Math.round(totalGold * (1 + pLevel * 0.05));
+  }
+
+  // Artifact exp/gold bonus
+  const artBonuses = getArtifactBonuses(waveData?.saveData?.artifacts);
+  if (artBonuses.expPercent) totalExp = Math.round(totalExp * (1 + artBonuses.expPercent / 100));
+  if (artBonuses.goldPercent) totalGold = Math.round(totalGold * (1 + artBonuses.goldPercent / 100));
+
   return { exp: totalExp, gold: totalGold, items };
 }
 
@@ -1045,6 +1064,8 @@ export function removeBattle(id: string): void {
   battleDungeonMap.delete(id);
   battleCritMap.delete(id);
   battleSetActiveMap.delete(id);
+  battlePrestigeMap.delete(id);
+  battleArtifactMap.delete(id);
   battleSkillLevelMap.delete(id);
   battleTalentMap.delete(id);
   battleTitleMap.delete(id);
@@ -1265,6 +1286,8 @@ export function initAbyssBattle(
     critDamage: (character.baseStats.critDamage + equipCritDmg) * (1 + statMods.critDmgPercent / 100) * (1 + talentModsAbyss.critDmgPercent / 100),
   });
   battleSetActiveMap.set(battleState.id, setActives);
+  battlePrestigeMap.set(battleState.id, saveData.prestigeLevel ?? 0);
+  battleArtifactMap.set(battleState.id, getArtifactBonuses(saveData.artifacts));
   battleSkillLevelMap.set(battleState.id, { ...(saveData.skillLevels ?? {}) });
   battleTalentMap.set(battleState.id, talentModsAbyss);
   battleTitleMap.set(battleState.id, saveData.equippedTitle ?? '');
@@ -1333,6 +1356,23 @@ export function calculateAbyssRewards(battleId: string, characterId: string): Ba
     if (abyssTitleDef?.bonus?.stat === 'goldPercent') {
       totalGold = Math.round(totalGold * (1 + abyssTitleDef.bonus.value / 100));
     }
+  }
+
+  // Prestige bonuses for abyss
+  const abyssSaveData = battleStore.get(battleId)?.player ? undefined : undefined; // need saveData
+  // Use abyssFloorMap to find prestige from the init data stored elsewhere
+  // Simpler: store prestige in a map at init. For now use a safe fallback.
+  const abyssPrestigeMap = battlePrestigeMap.get(battleId) ?? 0;
+  if (abyssPrestigeMap > 0) {
+    totalExp = Math.round(totalExp * (1 + abyssPrestigeMap * 0.10));
+    totalGold = Math.round(totalGold * (1 + abyssPrestigeMap * 0.05));
+  }
+
+  // Artifact exp/gold for abyss
+  const abyssArtBonuses = battleArtifactMap.get(battleId);
+  if (abyssArtBonuses) {
+    if (abyssArtBonuses.expPercent) totalExp = Math.round(totalExp * (1 + abyssArtBonuses.expPercent / 100));
+    if (abyssArtBonuses.goldPercent) totalGold = Math.round(totalGold * (1 + abyssArtBonuses.goldPercent / 100));
   }
 
   return { exp: totalExp, gold: totalGold, items };
@@ -1529,6 +1569,8 @@ export function initWeeklyBossBattle(
     critDamage: (character.baseStats.critDamage + equipCritDmg) * (1 + statMods.critDmgPercent / 100),
   });
   battleSetActiveMap.set(battleState.id, setActives);
+  battlePrestigeMap.set(battleState.id, saveData.prestigeLevel ?? 0);
+  battleArtifactMap.set(battleState.id, getArtifactBonuses(saveData.artifacts));
   battleSkillLevelMap.set(battleState.id, { ...(saveData.skillLevels ?? {}) });
   weeklyBossMap.set(battleState.id, true);
 

@@ -216,7 +216,21 @@ function HomeScreen() {
       if (art.effectType === 'defPercent') def = Math.round(def * (1 + val / 100));
     }
 
-    return { hp, mp, atk, def, spd, crit, critDmg };
+    // Calculate bonus percentages
+    const pLvl = saveData.prestigeLevel ?? 0;
+    let bonusExp = pLvl * 10;
+    let bonusGold = pLvl * 5 + (tp['util_gold'] ?? 0) * 5;
+    let bonusDrop = pLvl * 1;
+    for (const art of ARTIFACTS) {
+      const lv2 = (saveData.artifacts ?? {})[art.id] ?? 0;
+      if (lv2 <= 0) continue;
+      const val2 = art.effectPerLevel * lv2;
+      if (art.effectType === 'expPercent') bonusExp += val2;
+      if (art.effectType === 'goldPercent') bonusGold += val2;
+      if (art.effectType === 'dropRatePercent') bonusDrop += val2;
+    }
+
+    return { hp, mp, atk, def, spd, crit, critDmg, bonusExp, bonusGold, bonusDrop };
   }, [baseStats, equipStats, saveData]);
 
   const expToNext = useMemo(() => (saveData?.level ?? 1) * 100, [saveData?.level]);
@@ -436,15 +450,24 @@ function HomeScreen() {
           <StatPercent label="치명타 피해" base={baseStats.critDamage} equip={(totalStats?.critDmg ?? baseStats.critDamage) - baseStats.critDamage} color="text-purple-400" />
         </div>
 
+        {/* Bonus percentages */}
+        {(totalStats.bonusExp > 0 || totalStats.bonusGold > 0 || totalStats.bonusDrop > 0) && (
+          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-dungeon-border text-center text-[11px]">
+            {totalStats.bonusExp > 0 && <div><span className="text-gray-500">경험치</span><br/><span className="text-green-400 font-bold">+{totalStats.bonusExp}%</span></div>}
+            {totalStats.bonusGold > 0 && <div><span className="text-gray-500">골드</span><br/><span className="text-yellow-400 font-bold">+{totalStats.bonusGold}%</span></div>}
+            {totalStats.bonusDrop > 0 && <div><span className="text-gray-500">드랍률</span><br/><span className="text-purple-400 font-bold">+{totalStats.bonusDrop}%</span></div>}
+          </div>
+        )}
+
         {/* Gold & Gems */}
-        <div className="flex gap-6 mt-4 pt-3 border-t border-dungeon-border">
+        <div className="flex gap-6 mt-3 pt-3 border-t border-dungeon-border">
           <div className="flex items-center gap-2">
             <span className="text-yellow-400 text-lg">G</span>
             <span className="font-bold">{saveData.gold.toLocaleString()}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-purple-400 text-lg">&#9670;</span>
-            <span className="font-bold">{saveData.gems.toLocaleString()}</span>
+            <span className="font-bold">{(saveData.gems ?? 0).toLocaleString()}</span>
           </div>
         </div>
       </Card>
