@@ -134,20 +134,74 @@ const REROLL_COSTS: Record<string, number> = {
   legendary: 500000,
 };
 
-function formatOption(opt: RandomOption): string {
-  const label = OPTION_LABELS[opt.stat] ?? opt.stat;
-  const isPercent = opt.stat.includes('percent') || opt.stat === 'crit_rate' || opt.stat === 'crit_damage' || opt.stat === 'lifesteal' || opt.stat === 'reflect' || opt.stat === 'hp_regen';
-  return `${label} +${isPercent ? opt.value.toFixed(1) + '%' : Math.round(opt.value)}`;
+// Option ranges (mirrored from server OptionService)
+const OPTION_RANGES: Record<string, Record<string, [number, number]>> = {
+  atk_flat: { common: [5,50], uncommon: [10,100], rare: [20,200], epic: [50,500], legendary: [100,1000] },
+  atk_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,12], legendary: [8,20] },
+  crit_rate: { common: [1,2], uncommon: [1,3], rare: [2,5], epic: [3,7], legendary: [5,10] },
+  crit_damage: { common: [2,5], uncommon: [3,8], rare: [5,12], epic: [8,20], legendary: [10,30] },
+  def_flat: { common: [5,50], uncommon: [10,100], rare: [20,200], epic: [50,500], legendary: [100,1000] },
+  hp_flat: { common: [10,100], uncommon: [20,200], rare: [50,500], epic: [100,1000], legendary: [200,2000] },
+  hp_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,12], legendary: [8,20] },
+  gold_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,10], legendary: [5,15] },
+  exp_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,10], legendary: [5,15] },
+  speed: { common: [1,2], uncommon: [1,3], rare: [2,5], epic: [3,7], legendary: [5,10] },
+  lifesteal: { epic: [1,3], legendary: [2,5] },
+  reflect: { epic: [2,5], legendary: [3,8] },
+  hp_regen: { epic: [0.5,1], legendary: [1,2] },
+};
+
+function getQuality(stat: string, rarity: string, value: number): { percent: number; label: string; color: string } {
+  const range = OPTION_RANGES[stat]?.[rarity];
+  if (!range) return { percent: 50, label: '일반', color: 'text-gray-300' };
+  const [min, max] = range;
+  const pct = max === min ? 100 : Math.round(((value - min) / (max - min)) * 100);
+  if (pct >= 75) return { percent: pct, label: '최상급', color: 'text-yellow-400' };
+  if (pct >= 50) return { percent: pct, label: '상급', color: 'text-green-400' };
+  if (pct >= 25) return { percent: pct, label: '일반', color: 'text-gray-300' };
+  return { percent: pct, label: '하급', color: 'text-gray-500' };
 }
 
-function RandomOptionsDisplay({ options }: { options: RandomOption[] }) {
-  if (!options || options.length === 0) return null;
+function formatValue(stat: string, value: number): string {
+  const isPercent = stat.includes('percent') || stat === 'crit_rate' || stat === 'crit_damage' || stat === 'lifesteal' || stat === 'reflect' || stat === 'hp_regen';
+  return isPercent ? value.toFixed(1) + '%' : String(Math.round(value));
+}
+
+function RandomOptionsDisplay({ options, rarity, lockedIndices, onToggleLock, showLock }: {
+  options: RandomOption[];
+  rarity?: string;
+  lockedIndices?: Set<number>;
+  onToggleLock?: (idx: number) => void;
+  showLock?: boolean;
+}) {
+  if (!options || options.length === 0) return <p className="text-xs text-gray-600 mt-1">옵션 없음 (리롤하면 생성됩니다)</p>;
   return (
     <div className="panel p-2 space-y-1">
       <p className="text-xs font-bold text-yellow-400">랜덤 옵션</p>
-      {options.map((opt, i) => (
-        <p key={i} className="text-xs text-green-300">+ {formatOption(opt)}</p>
-      ))}
+      {options.map((opt, i) => {
+        const label = OPTION_LABELS[opt.stat] ?? opt.stat;
+        const range = rarity ? OPTION_RANGES[opt.stat]?.[rarity] : null;
+        const quality = rarity ? getQuality(opt.stat, rarity, opt.value) : null;
+        const isLocked = lockedIndices?.has(i) ?? false;
+        return (
+          <div key={i} className="flex items-center gap-1.5 text-xs">
+            {showLock && onToggleLock && (
+              <button type="button" onClick={() => onToggleLock(i)} className={`text-sm ${isLocked ? 'text-yellow-400' : 'text-gray-600'}`}>
+                {isLocked ? '\uD83D\uDD12' : '\uD83D\uDD13'}
+              </button>
+            )}
+            <span className={quality?.color ?? 'text-green-300'}>
+              {label} +{formatValue(opt.stat, opt.value)}
+            </span>
+            {range && (
+              <span className="text-[9px] text-gray-600">({formatValue(opt.stat, range[0])}~{formatValue(opt.stat, range[1])})</span>
+            )}
+            {quality && (
+              <span className={`text-[9px] ${quality.color}`}>[{quality.label}]</span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -489,8 +543,10 @@ function EquippedDetailModal({
   onSocket: (itemId: string, gemId: string) => void;
   onUnsocket: (itemId: string, socketIndex: number) => void;
   itemOptions: RandomOption[];
-  onReroll: (itemId: string) => void;
+  onReroll: (itemId: string, lockedIndices?: number[]) => void;
 }) {
+  const [lockedOptions, setLockedOptions] = useState<Set<number>>(new Set());
+
   if (!slot?.data) return null;
 
   const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000 };
@@ -498,7 +554,6 @@ function EquippedDetailModal({
   const enhanceCostGold = (RARITY_BASE[slot.data.rarity] ?? 1000) * target * target;
   const enhanceRate = target <= 5 ? 50 : Math.max(5, 50 - (target - 5) * 1.5);
   const canEnhance = slot.enhanceLevel < 99;
-  const rerollCost = REROLL_COSTS[slot.data.rarity] ?? 10000;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={slot.data.name}>
@@ -513,22 +568,36 @@ function EquippedDetailModal({
         <p className="text-sm text-gray-300">{slot.data.description}</p>
         <ItemStatsDisplay item={slot.data} enhanceLevel={slot.enhanceLevel} />
 
-        {/* Random options */}
-        <RandomOptionsDisplay options={itemOptions} />
-        {itemOptions.length > 0 && (
-          <div className="panel p-2 text-center space-y-1">
-            <p className="text-xs text-gray-400">옵션 리롤</p>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={gold < rerollCost}
-              onClick={() => onReroll(slot.data!.id)}
-              className="w-full"
-            >
-              {gold < rerollCost ? 'Gold 부족' : `리롤 (${rerollCost.toLocaleString()}G)`}
-            </Button>
-          </div>
-        )}
+        {/* Random options with lock + reroll */}
+        {(() => {
+          const baseCost = REROLL_COSTS[slot.data.rarity] ?? 10000;
+          const lockCount = lockedOptions.size;
+          const cost = Math.round(baseCost * (1 + lockCount * 0.5));
+          return (
+            <>
+              <RandomOptionsDisplay
+                options={itemOptions}
+                rarity={slot.data.rarity}
+                lockedIndices={lockedOptions}
+                onToggleLock={(idx) => setLockedOptions((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(idx)) next.delete(idx); else next.add(idx);
+                  return next;
+                })}
+                showLock={itemOptions.length > 0}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={gold < cost}
+                onClick={() => onReroll(slot.data!.id, Array.from(lockedOptions))}
+                className="w-full mt-1"
+              >
+                옵션 리롤 ({cost.toLocaleString()}G{lockCount > 0 ? ` / 잠금 ${lockCount}개` : ''})
+              </Button>
+            </>
+          );
+        })()}
 
         {/* Gem sockets */}
         <GemSocketSection
@@ -642,9 +711,11 @@ function ItemDetailModal({
   onSocket: (itemId: string, gemId: string) => void;
   onUnsocket: (itemId: string, socketIndex: number) => void;
   itemOptions: RandomOption[];
-  onReroll: (itemId: string) => void;
+  onReroll: (itemId: string, lockedIndices?: number[]) => void;
   onDismantle: (itemId: string) => void;
 }) {
+  const [lockedOptions, setLockedOptions] = useState<Set<number>>(new Set());
+
   if (!item) return null;
 
   const isEquipType = ['weapon', 'shield', 'offhand', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory'].includes(item.type);
@@ -735,21 +806,37 @@ function ItemDetailModal({
           />
         )}
 
-        {/* Random options + Reroll */}
-        {isEquipType && (
-          <>
-            <RandomOptionsDisplay options={itemOptions ?? []} />
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={gold < (REROLL_COSTS[item.rarity] ?? 10000)}
-              onClick={() => onReroll(item.id)}
-              className="w-full mt-1"
-            >
-              옵션 리롤 ({(REROLL_COSTS[item.rarity] ?? 10000).toLocaleString()}G)
-            </Button>
-          </>
-        )}
+        {/* Random options + Reroll with locks */}
+        {isEquipType && (() => {
+          const opts = itemOptions ?? [];
+          const baseCost = REROLL_COSTS[item.rarity] ?? 10000;
+          const lockCount = lockedOptions.size;
+          const rerollCost = Math.round(baseCost * (1 + lockCount * 0.5));
+          return (
+            <>
+              <RandomOptionsDisplay
+                options={opts}
+                rarity={item.rarity}
+                lockedIndices={lockedOptions}
+                onToggleLock={(idx) => setLockedOptions((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(idx)) next.delete(idx); else next.add(idx);
+                  return next;
+                })}
+                showLock={opts.length > 0}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={gold < rerollCost}
+                onClick={() => onReroll(item.id, Array.from(lockedOptions))}
+                className="w-full mt-1"
+              >
+                옵션 리롤 ({rerollCost.toLocaleString()}G{lockCount > 0 ? ` / 잠금 ${lockCount}개` : ''})
+              </Button>
+            </>
+          );
+        })()}
 
         {/* Gold enhance */}
         {isEquipType && goldEnhanceInfo && (
@@ -944,11 +1031,12 @@ function InventoryScreen() {
     [unequipItem],
   );
 
-  const handleReroll = useCallback(async (itemId: string) => {
+  const handleReroll = useCallback(async (itemId: string, lockedIndices?: number[]) => {
     try {
-      const ok = await confirm('랜덤 옵션을 리롤하시겠습니까? 기존 옵션이 사라집니다.');
+      const lockCount = lockedIndices?.length ?? 0;
+      const ok = await confirm(`랜덤 옵션을 리롤하시겠습니까?${lockCount > 0 ? ` (잠금 ${lockCount}개 유지)` : ' 기존 옵션이 변경됩니다.'}`);
       if (!ok) return;
-      const res = await axios.post('/api/inventory/reroll', { itemId });
+      const res = await axios.post('/api/inventory/reroll', { itemId, lockedIndices });
       if (res.data.success) {
         updateSaveData(res.data.saveData);
         toast.success(`리롤 완료! (${res.data.goldSpent.toLocaleString()}G 소모)`);

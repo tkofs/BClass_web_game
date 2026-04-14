@@ -98,6 +98,57 @@ export function getRerollCost(rarity: string): number {
   return costs[rarity] ?? 10000;
 }
 
+/** Reroll with locked indices — locked options stay, rest get rerolled */
+export function rerollWithLocks(rarity: string, currentOptions: RandomOption[], lockedIndices: number[]): RandomOption[] {
+  const newOptions: RandomOption[] = [];
+  const usedStats = new Set<string>();
+
+  // Keep locked options
+  for (const idx of lockedIndices) {
+    if (idx >= 0 && idx < currentOptions.length) {
+      newOptions.push(currentOptions[idx]);
+      usedStats.add(currentOptions[idx].stat);
+    }
+  }
+
+  // Determine how many new options to generate
+  const count = getOptionCount(rarity);
+  const needed = count - newOptions.length;
+
+  const allOptions: OptionDef[] = [...OPTION_POOL.offensive, ...OPTION_POOL.defensive, ...OPTION_POOL.utility];
+  if (rarity === 'epic' || rarity === 'legendary') allOptions.push(...OPTION_POOL.special);
+  const available = allOptions.filter((o) => o.ranges[rarity as RarityKey] && !usedStats.has(o.stat));
+
+  for (let i = 0; i < needed && available.length > 0; i++) {
+    const candidates = available.filter((o) => !usedStats.has(o.stat));
+    if (candidates.length === 0) break;
+    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    const range = picked.ranges[rarity as RarityKey];
+    if (!range) continue;
+    newOptions.push({ stat: picked.stat, value: rollValue(range[0], range[1]) });
+    usedStats.add(picked.stat);
+  }
+
+  return newOptions;
+}
+
+/** Get range [min, max] for a stat at given rarity */
+export function getOptionRange(stat: string, rarity: string): [number, number] | null {
+  const allOptions = [...OPTION_POOL.offensive, ...OPTION_POOL.defensive, ...OPTION_POOL.utility, ...OPTION_POOL.special];
+  const def = allOptions.find((o) => o.stat === stat);
+  if (!def) return null;
+  return def.ranges[rarity as RarityKey] ?? null;
+}
+
+/** Get quality tier (0~100%) of a value within its range */
+export function getOptionQuality(stat: string, rarity: string, value: number): number {
+  const range = getOptionRange(stat, rarity);
+  if (!range) return 50;
+  const [min, max] = range;
+  if (max === min) return 100;
+  return Math.round(((value - min) / (max - min)) * 100);
+}
+
 /** Option stat label map for client display */
 export const OPTION_LABELS: Record<string, string> = {
   atk_flat: '공격력',

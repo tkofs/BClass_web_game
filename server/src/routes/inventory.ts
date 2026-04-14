@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { validate } from '../middleware/validate';
 import * as AuthService from '../services/AuthService';
 import * as GameService from '../services/GameService';
-import { generateOptions, getRerollCost } from '../services/OptionService';
+import { generateOptions, getRerollCost, rerollWithLocks, getOptionRange, getOptionQuality } from '../services/OptionService';
 import { ITEMS, GEMS } from '../../../shared/data';
 import type { ItemRarity } from '../../../shared/types/item';
 
@@ -400,7 +400,9 @@ router.post(
         return;
       }
 
-      const { itemId } = req.body;
+      const { itemId, lockedIndices } = req.body;
+      const locks: number[] = Array.isArray(lockedIndices) ? lockedIndices : [];
+
       const itemDef = ITEMS.find((i) => i.id === itemId);
       if (!itemDef) {
         res.status(400).json({ success: false, message: 'Item not found' });
@@ -415,16 +417,19 @@ router.post(
         return;
       }
 
-      const cost = getRerollCost(itemDef.rarity);
+      // Cost increases per locked option
+      const baseCost = getRerollCost(itemDef.rarity);
+      const cost = Math.round(baseCost * (1 + locks.length * 0.5));
       if (saveData.gold < cost) {
         res.status(400).json({ success: false, message: `골드가 부족합니다 (필요: ${cost.toLocaleString()}G)` });
         return;
       }
 
-      // Deduct gold and generate new options
+      // Deduct gold and reroll (with locks)
       saveData.gold -= cost;
       if (!saveData.itemOptions) saveData.itemOptions = {};
-      saveData.itemOptions[itemId] = generateOptions(itemDef.rarity);
+      const currentOpts = saveData.itemOptions[itemId] ?? [];
+      saveData.itemOptions[itemId] = rerollWithLocks(itemDef.rarity, currentOpts, locks);
 
       AuthService.saveProgress(saveCode, saveData);
       res.json({ success: true, options: saveData.itemOptions[itemId], goldSpent: cost, saveData });
