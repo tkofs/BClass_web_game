@@ -2,7 +2,7 @@ import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameStore } from '@/stores/gameStore';
-import { CHARACTERS, ITEMS, TITLES } from '@shared/data';
+import { CHARACTERS, ITEMS, TITLES, SETS, GEMS, PETS, ARTIFACTS } from '@shared/data';
 import Card from '@/components/common/Card';
 import StatBar from '@/components/common/StatBar';
 import axios from 'axios';
@@ -124,6 +124,100 @@ function HomeScreen() {
     };
   }, [character, saveData]);
 
+  // Total combat stats (matching server calculation)
+  const totalStats = useMemo(() => {
+    if (!baseStats || !saveData) return null;
+    let hp = baseStats.hp + equipStats.hp;
+    let mp = baseStats.mp + equipStats.mp;
+    let atk = baseStats.attack + equipStats.attack;
+    let def = baseStats.defense + equipStats.defense;
+    let spd = baseStats.speed + equipStats.speed;
+    let crit = baseStats.critRate + equipStats.critRate;
+    let critDmg = baseStats.critDamage + equipStats.critDamage;
+
+    // Socketed gems
+    const equippedIds = Object.values(saveData.equippedItems).filter(Boolean) as string[];
+    for (const id of equippedIds) {
+      for (const gemId of (saveData.socketedGems?.[id] ?? [])) {
+        const gem = GEMS.find((g) => g.id === gemId);
+        if (!gem) continue;
+        if (gem.stat === 'attack') atk += gem.value;
+        else if (gem.stat === 'defense') def += gem.value;
+        else if (gem.stat === 'hp') hp += gem.value;
+        else if (gem.stat === 'mp') mp += gem.value;
+        else if (gem.stat === 'speed') spd += gem.value;
+        else if (gem.stat === 'critRate') crit += gem.value;
+        else if (gem.stat === 'critDamage') critDmg += gem.value;
+      }
+    }
+
+    // Set bonuses
+    for (const set of SETS) {
+      const count = set.pieces.filter((p) => equippedIds.includes(p)).length;
+      for (const b of set.bonuses) {
+        if (count >= b.requiredCount && b.stats) {
+          atk = Math.round(atk * (1 + (b.stats.atkPercent ?? 0) / 100));
+          def = Math.round(def * (1 + (b.stats.defPercent ?? 0) / 100));
+          hp = Math.round(hp * (1 + (b.stats.hpPercent ?? 0) / 100));
+          mp = Math.round(mp * (1 + (b.stats.mpPercent ?? 0) / 100));
+          crit += b.stats.critRateFlat ?? 0;
+          critDmg *= (1 + (b.stats.critDmgPercent ?? 0) / 100);
+        }
+      }
+    }
+
+    // Prestige
+    const pBonus = 1 + (saveData.prestigeLevel ?? 0) * 0.02;
+    hp = Math.round(hp * pBonus); mp = Math.round(mp * pBonus);
+    atk = Math.round(atk * pBonus); def = Math.round(def * pBonus);
+
+    // Talents
+    const tp = saveData.talentPoints ?? {};
+    atk = Math.round(atk * (1 + (tp['off_atk'] ?? 0) * 3 / 100));
+    def = Math.round(def * (1 + (tp['def_def'] ?? 0) * 3 / 100));
+    hp = Math.round(hp * (1 + (tp['def_hp'] ?? 0) * 5 / 100));
+    mp = Math.round(mp * (1 + (tp['util_mp'] ?? 0) * 5 / 100));
+    crit += (tp['off_crit'] ?? 0) * 0.01;
+    critDmg *= (1 + (tp['off_critdmg'] ?? 0) * 5 / 100);
+
+    // Title
+    if (saveData.equippedTitle) {
+      const title = TITLES.find((t) => t.id === saveData.equippedTitle);
+      if (title?.bonus) {
+        if (title.bonus.stat === 'atkPercent') atk = Math.round(atk * (1 + title.bonus.value / 100));
+        if (title.bonus.stat === 'defPercent') def = Math.round(def * (1 + title.bonus.value / 100));
+        if (title.bonus.stat === 'hpPercent') hp = Math.round(hp * (1 + title.bonus.value / 100));
+      }
+    }
+
+    // Pet
+    if (saveData.activePet) {
+      const pet = PETS.find((p) => p.id === saveData.activePet);
+      if (pet) {
+        for (const b of pet.bonus) {
+          if (b.stat === 'atkPercent') atk = Math.round(atk * (1 + b.value / 100));
+          if (b.stat === 'defPercent') def = Math.round(def * (1 + b.value / 100));
+          if (b.stat === 'hpPercent') hp = Math.round(hp * (1 + b.value / 100));
+          if (b.stat === 'mpPercent') mp = Math.round(mp * (1 + b.value / 100));
+          if (b.stat === 'critRateFlat') crit += b.value;
+        }
+      }
+    }
+
+    // Artifacts
+    for (const art of ARTIFACTS) {
+      const lv = (saveData.artifacts ?? {})[art.id] ?? 0;
+      if (lv <= 0) continue;
+      const val = art.effectPerLevel * lv;
+      if (art.effectType === 'hpPercent') hp = Math.round(hp * (1 + val / 100));
+      if (art.effectType === 'mpPercent') mp = Math.round(mp * (1 + val / 100));
+      if (art.effectType === 'atkPercent') atk = Math.round(atk * (1 + val / 100));
+      if (art.effectType === 'defPercent') def = Math.round(def * (1 + val / 100));
+    }
+
+    return { hp, mp, atk, def, spd, crit, critDmg };
+  }, [baseStats, equipStats, saveData]);
+
   const expToNext = useMemo(() => (saveData?.level ?? 1) * 100, [saveData?.level]);
 
   const handleLogout = useCallback(() => { logout(); navigate('/'); }, [logout, navigate]);
@@ -214,7 +308,7 @@ function HomeScreen() {
     }
   }, [updateSaveData]);
 
-  if (!saveData || !character || !baseStats) return null;
+  if (!saveData || !character || !baseStats || !totalStats) return null;
 
   return (
     <div className="max-w-4xl mx-auto p-4 min-h-screen relative">
@@ -323,22 +417,22 @@ function HomeScreen() {
         {/* HP / MP bars */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <StatBar current={baseStats.hp + equipStats.hp} max={baseStats.hp + equipStats.hp} color="health" label="HP" showNumbers />
-            {equipStats.hp > 0 && <p className="text-[10px] text-green-400 text-right mt-0.5">장비 +{equipStats.hp}</p>}
+            <StatBar current={totalStats?.hp ?? 0} max={totalStats?.hp ?? 0} color="health" label="HP" showNumbers />
+            <p className="text-[10px] text-gray-500 text-right mt-0.5">기본 {baseStats.hp}{equipStats.hp > 0 ? ` + 장비 ${equipStats.hp}` : ''}{(totalStats?.hp ?? 0) > baseStats.hp + equipStats.hp ? ` + 보너스 ${(totalStats?.hp ?? 0) - baseStats.hp - equipStats.hp}` : ''}</p>
           </div>
           <div>
-            <StatBar current={baseStats.mp + equipStats.mp} max={baseStats.mp + equipStats.mp} color="mana" label="MP" showNumbers />
-            {equipStats.mp > 0 && <p className="text-[10px] text-green-400 text-right mt-0.5">장비 +{equipStats.mp}</p>}
+            <StatBar current={totalStats?.mp ?? 0} max={totalStats?.mp ?? 0} color="mana" label="MP" showNumbers />
+            <p className="text-[10px] text-gray-500 text-right mt-0.5">기본 {baseStats.mp}{equipStats.mp > 0 ? ` + 장비 ${equipStats.mp}` : ''}{(totalStats?.mp ?? 0) > baseStats.mp + equipStats.mp ? ` + 보너스 ${(totalStats?.mp ?? 0) - baseStats.mp - equipStats.mp}` : ''}</p>
           </div>
         </div>
 
-        {/* Core stats */}
+        {/* Core stats — show total with breakdown */}
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
-          <StatValue label="공격력" base={baseStats.attack} equip={equipStats.attack} />
-          <StatValue label="방어력" base={baseStats.defense} equip={equipStats.defense} />
+          <StatValue label="공격력" base={baseStats.attack} equip={(totalStats?.atk ?? baseStats.attack) - baseStats.attack} />
+          <StatValue label="방어력" base={baseStats.defense} equip={(totalStats?.def ?? baseStats.defense) - baseStats.defense} />
           <StatValue label="속도" base={baseStats.speed} equip={equipStats.speed} />
-          <StatPercent label="치명타율" base={baseStats.critRate} equip={equipStats.critRate} color="text-yellow-400" />
-          <StatPercent label="치명타 피해" base={baseStats.critDamage} equip={equipStats.critDamage} color="text-purple-400" />
+          <StatPercent label="치명타율" base={baseStats.critRate} equip={(totalStats?.crit ?? baseStats.critRate) - baseStats.critRate} color="text-yellow-400" />
+          <StatPercent label="치명타 피해" base={baseStats.critDamage} equip={(totalStats?.critDmg ?? baseStats.critDamage) - baseStats.critDamage} color="text-purple-400" />
         </div>
 
         {/* Gold & Gems */}
