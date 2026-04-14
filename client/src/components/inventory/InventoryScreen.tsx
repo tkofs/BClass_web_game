@@ -751,6 +751,7 @@ function ItemDetailModal({
   lockedOptions: Set<number>;
   onToggleLock: (idx: number) => void;
 }) {
+  const { updateSaveData } = useAuth();
   if (!item) return null;
 
   const isEquipType = ['weapon', 'shield', 'offhand', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory'].includes(item.type);
@@ -891,6 +892,40 @@ function ItemDetailModal({
             </Button>
           </div>
         )}
+
+        {/* Enhancement stone usage for inventory items */}
+        {isEquipType && enhanceLevel < 99 && (() => {
+          const stoneTypes = [
+            { id: 'enhance_stone_legendary', name: '전설', exp: 100, color: 'text-yellow-400' },
+            { id: 'enhance_stone_epic', name: '영웅', exp: 30, color: 'text-purple-400' },
+            { id: 'enhance_stone_rare', name: '희귀', exp: 10, color: 'text-blue-400' },
+            { id: 'enhance_stone_uncommon', name: '고급', exp: 3, color: 'text-green-400' },
+            { id: 'enhance_stone_common', name: '일반', exp: 1, color: 'text-gray-400' },
+          ];
+          return (
+            <div className="panel p-2 space-y-1">
+              <p className="text-xs text-gray-400">강화석 사용</p>
+              <div className="flex gap-1 flex-wrap">
+                {stoneTypes.map((st) => (
+                  <button key={st.id} type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await axios.post('/api/inventory/use-enhance-stone', { stoneId: st.id, targetItemId: item.id, quantity: 1 });
+                        if (res.data.success) {
+                          updateSaveData(res.data.saveData);
+                          const d = res.data;
+                          const lvlUp = d.afterLevel > d.beforeLevel ? ` → +${d.afterLevel} (레벨업!)` : '';
+                          toast.success(`강화석 사용! +${d.beforeLevel}${lvlUp} (경험치 ${d.currentExp}/${d.nextCost ?? 'MAX'})`);
+                        }
+                      } catch (err: any) { toast.error(err.response?.data?.message || '사용 실패'); }
+                    }}
+                    className={`text-[10px] px-2 py-1 rounded bg-dungeon-bg border border-dungeon-border hover:border-dungeon-accent ${st.color} transition-colors`}
+                  >{st.name} (+{st.exp})</button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="flex gap-2">
           {item.type === 'consumable' && (

@@ -1287,6 +1287,13 @@ export function initAbyssBattle(
     }
   }
 
+  // Artifact bonus (abyss)
+  const artBonusesAbyss = getArtifactBonuses(saveData.artifacts);
+  baseHp = Math.round(baseHp * (1 + (artBonusesAbyss.hpPercent ?? 0) / 100));
+  baseMp = Math.round(baseMp * (1 + (artBonusesAbyss.mpPercent ?? 0) / 100));
+  baseAtk = Math.round(baseAtk * (1 + (artBonusesAbyss.atkPercent ?? 0) / 100));
+  baseDef = Math.round(baseDef * (1 + (artBonusesAbyss.defPercent ?? 0) / 100));
+
   // Random option percent bonuses (abyss)
   if (randOptsAbyss.atkPercent > 0) baseAtk = Math.round(baseAtk * (1 + randOptsAbyss.atkPercent / 100));
   if (randOptsAbyss.hpPercent > 0) baseHp = Math.round(baseHp * (1 + randOptsAbyss.hpPercent / 100));
@@ -1626,6 +1633,25 @@ export function initWeeklyBossBattle(
   baseAtk = Math.round(baseAtk * prestigeBonusWb);
   baseDef = Math.round(baseDef * prestigeBonusWb);
 
+  // Talent bonuses (weekly boss)
+  const talentModsWb = calculateTalentBonuses(saveData.talentPoints ?? {});
+  baseHp = Math.round(baseHp * (1 + talentModsWb.hpPercent / 100));
+  baseMp = Math.round(baseMp * (1 + talentModsWb.mpPercent / 100));
+  baseAtk = Math.round(baseAtk * (1 + talentModsWb.atkPercent / 100));
+  baseDef = Math.round(baseDef * (1 + talentModsWb.defPercent / 100));
+
+  // Title bonus (weekly boss)
+  const titleIdWb = saveData.equippedTitle ?? '';
+  if (titleIdWb) {
+    const titleDefWb = TITLES.find((t) => t.id === titleIdWb);
+    if (titleDefWb?.bonus) {
+      if (titleDefWb.bonus.stat === 'atkPercent') baseAtk = Math.round(baseAtk * (1 + titleDefWb.bonus.value / 100));
+      if (titleDefWb.bonus.stat === 'defPercent') baseDef = Math.round(baseDef * (1 + titleDefWb.bonus.value / 100));
+      if (titleDefWb.bonus.stat === 'hpPercent') baseHp = Math.round(baseHp * (1 + titleDefWb.bonus.value / 100));
+      if (titleDefWb.bonus.stat === 'mpPercent') baseMp = Math.round(baseMp * (1 + titleDefWb.bonus.value / 100));
+    }
+  }
+
   // Pet bonus (weekly boss)
   let petCritRateBonusWb = 0;
   if (saveData.activePet) {
@@ -1640,6 +1666,13 @@ export function initWeeklyBossBattle(
       }
     }
   }
+
+  // Artifact bonus (weekly boss)
+  const artBonusesWb = getArtifactBonuses(saveData.artifacts);
+  baseHp = Math.round(baseHp * (1 + (artBonusesWb.hpPercent ?? 0) / 100));
+  baseMp = Math.round(baseMp * (1 + (artBonusesWb.mpPercent ?? 0) / 100));
+  baseAtk = Math.round(baseAtk * (1 + (artBonusesWb.atkPercent ?? 0) / 100));
+  baseDef = Math.round(baseDef * (1 + (artBonusesWb.defPercent ?? 0) / 100));
 
   // Random option percent bonuses (weekly boss)
   if (randOptsWb.atkPercent > 0) baseAtk = Math.round(baseAtk * (1 + randOptsWb.atkPercent / 100));
