@@ -649,7 +649,12 @@ function EquippedDetailModal({
                     onClick={async () => {
                       try {
                         const res = await axios.post('/api/inventory/use-enhance-stone', { stoneId: st.id, targetItemId: slot.data!.id, quantity: 1 });
-                        if (res.data.success) { updateSaveData(res.data.saveData); toast.success(`${st.name} 강화석 사용! (+${st.exp} exp)`); }
+                        if (res.data.success) {
+                          updateSaveData(res.data.saveData);
+                          const d = res.data;
+                          const lvlUp = d.afterLevel > d.beforeLevel ? ` → +${d.afterLevel} (레벨업!)` : '';
+                          toast.success(`강화석 사용! +${d.beforeLevel}${lvlUp} (경험치 ${d.currentExp}/${d.nextCost ?? 'MAX'})`);
+                        }
                       } catch (err: any) { toast.error(err.response?.data?.message || '사용 실패'); }
                     }}
                     className={`text-[10px] px-2 py-1 rounded bg-dungeon-bg border border-dungeon-border hover:border-dungeon-accent ${st.color} transition-colors`}

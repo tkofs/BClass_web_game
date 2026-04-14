@@ -399,29 +399,25 @@ const ENHANCE_STONE_EXP: Record<string, number> = {
   'enhance_stone_legendary': 100,
 };
 
-export function useEnhanceStone(saveData: SaveData, stoneId: string, targetItemId: string, quantity: number): { success: boolean; error?: string } {
+export function useEnhanceStone(saveData: SaveData, stoneId: string, targetItemId: string, quantity: number): { success: boolean; error?: string; beforeLevel?: number; afterLevel?: number; expAdded?: number; currentExp?: number; nextCost?: number } {
   const expPerStone = ENHANCE_STONE_EXP[stoneId];
   if (!expPerStone) return { success: false, error: 'Invalid enhancement stone' };
 
   if (quantity <= 0) return { success: false, error: 'Quantity must be positive' };
 
-  // Check stone in inventory
   const stoneSlot = saveData.inventory.find(s => s.itemId === stoneId);
   if (!stoneSlot || stoneSlot.quantity < quantity) return { success: false, error: 'Not enough enhancement stones' };
 
-  // Check target item ownership
   if (!ownsEquipment(saveData, targetItemId)) return { success: false, error: 'Target item not owned' };
 
-  // Remove stones
   const removed = removeItem(saveData, stoneId, quantity);
   if (!removed.success) return { success: false, error: removed.error };
 
-  // Add exp
   if (!saveData.enhanceLevels) saveData.enhanceLevels = {};
   const entry = saveData.enhanceLevels[targetItemId] ?? { level: 0, exp: 0 };
+  const beforeLevel = entry.level;
   entry.exp += expPerStone * quantity;
 
-  // Process level-ups
   while (entry.level < MAX_ENHANCE_LEVEL) {
     const cost = enhanceCost(entry.level + 1);
     if (entry.exp < cost) break;
@@ -431,7 +427,14 @@ export function useEnhanceStone(saveData: SaveData, stoneId: string, targetItemI
   if (entry.level >= MAX_ENHANCE_LEVEL) { entry.level = MAX_ENHANCE_LEVEL; entry.exp = 0; }
 
   saveData.enhanceLevels[targetItemId] = entry;
-  return { success: true };
+  return {
+    success: true,
+    beforeLevel,
+    afterLevel: entry.level,
+    expAdded: expPerStone * quantity,
+    currentExp: entry.exp,
+    nextCost: entry.level < MAX_ENHANCE_LEVEL ? enhanceCost(entry.level + 1) : undefined,
+  };
 }
 
 // ────────────────────────────────────────────────────────────

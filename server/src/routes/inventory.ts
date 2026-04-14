@@ -377,7 +377,15 @@ router.post(
       }
 
       AuthService.saveProgress(saveCode, saveData);
-      res.json({ success: true, saveData });
+      res.json({
+        success: true,
+        beforeLevel: result.beforeLevel,
+        afterLevel: result.afterLevel,
+        expAdded: result.expAdded,
+        currentExp: result.currentExp,
+        nextCost: result.nextCost,
+        saveData,
+      });
     } catch (err) {
       console.error('[inventory/use-enhance-stone]', err);
       res.status(500).json({ success: false, message: 'Internal server error' });
