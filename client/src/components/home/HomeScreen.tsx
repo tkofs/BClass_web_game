@@ -152,6 +152,24 @@ function HomeScreen() {
       }
     }
 
+    // Random option bonuses
+    let randOptAtkPct = 0, randOptHpPct = 0, randOptGoldPct = 0, randOptExpPct = 0;
+    for (const id of equippedIds) {
+      const opts = saveData.itemOptions?.[id] ?? [];
+      for (const opt of opts) {
+        if (opt.stat === 'atk_flat') atk += opt.value;
+        else if (opt.stat === 'atk_percent') randOptAtkPct += opt.value;
+        else if (opt.stat === 'def_flat') def += opt.value;
+        else if (opt.stat === 'hp_flat') hp += opt.value;
+        else if (opt.stat === 'hp_percent') randOptHpPct += opt.value;
+        else if (opt.stat === 'speed') spd += opt.value;
+        else if (opt.stat === 'crit_rate') crit += opt.value / 100;
+        else if (opt.stat === 'crit_damage') critDmg += opt.value / 100;
+        else if (opt.stat === 'gold_percent') randOptGoldPct += opt.value;
+        else if (opt.stat === 'exp_percent') randOptExpPct += opt.value;
+      }
+    }
+
     // Set bonuses
     for (const set of SETS) {
       const count = set.pieces.filter((p) => equippedIds.includes(p)).length;
@@ -216,10 +234,14 @@ function HomeScreen() {
       if (art.effectType === 'defPercent') def = Math.round(def * (1 + val / 100));
     }
 
+    // Apply random option percent bonuses
+    if (randOptAtkPct > 0) atk = Math.round(atk * (1 + randOptAtkPct / 100));
+    if (randOptHpPct > 0) hp = Math.round(hp * (1 + randOptHpPct / 100));
+
     // Calculate bonus percentages
     const pLvl = saveData.prestigeLevel ?? 0;
-    let bonusExp = pLvl * 10;
-    let bonusGold = pLvl * 5 + (tp['util_gold'] ?? 0) * 5;
+    let bonusExp = pLvl * 10 + randOptExpPct;
+    let bonusGold = pLvl * 5 + (tp['util_gold'] ?? 0) * 5 + randOptGoldPct;
     let bonusDrop = pLvl * 1;
     for (const art of ARTIFACTS) {
       const lv2 = (saveData.artifacts ?? {})[art.id] ?? 0;
