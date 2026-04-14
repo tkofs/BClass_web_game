@@ -982,6 +982,7 @@ export function calculateRewards(battleId: string, characterId: string): BattleR
   if (!dungeon) return null;
 
   const lootTable = DUNGEON_LOOT_TABLE[dungeonId];
+  const waveData = battleWaveMap.get(battleId);
 
   let totalExp = dungeon.rewards.exp;
   let totalGold = dungeon.rewards.gold;
@@ -1038,7 +1039,6 @@ export function calculateRewards(battleId: string, characterId: string): BattleR
   }
 
   // Apply title gold bonus
-  const waveData = battleWaveMap.get(battleId);
   if (waveData?.saveData) {
     const titleId = waveData.saveData.equippedTitle ?? '';
     if (titleId) {
