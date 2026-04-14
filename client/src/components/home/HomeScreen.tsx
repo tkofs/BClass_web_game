@@ -6,6 +6,7 @@ import { CHARACTERS, ITEMS, TITLES, SETS, GEMS, PETS, ARTIFACTS } from '@shared/
 import Card from '@/components/common/Card';
 import StatBar from '@/components/common/StatBar';
 import axios from 'axios';
+import { toast, confirm } from '@/components/common/Toast';
 
 const APPEARANCE_COLORS = [
   '#8B5CF6', // purple (default)
@@ -272,7 +273,7 @@ function HomeScreen() {
     const levelBonus = Math.max(0, (saveData?.level ?? 60) - 60) * 2;
     const abyssBonus = Math.floor((saveData?.abyssHighest ?? 0) * 0.5);
     const totalGems = baseGems + levelBonus + abyssBonus;
-    const confirmed = window.confirm(
+    const confirmed = await confirm(
       `환생하시겠습니까?\n\n` +
       `초기화:\n` +
       `- 레벨 (현재 ${saveData?.level})\n` +
@@ -288,10 +289,10 @@ function HomeScreen() {
       const res = await axios.post('/api/game/prestige');
       if (res.data.success && res.data.saveData) {
         updateSaveData(res.data.saveData);
-        alert(res.data.message);
+        toast.success(res.data.message);
       }
     } catch {
-      alert('환생에 실패했습니다.');
+      toast.error('환생에 실패했습니다.');
     }
   }, [saveData, updateSaveData]);
 
@@ -304,7 +305,7 @@ function HomeScreen() {
         setDailyStatus((prev) => prev ? { ...prev, canClaim: false } : null);
       }
     } catch {
-      alert('보상 수령에 실패했습니다.');
+      toast.error('보상 수령에 실패했습니다.');
     }
   }, [updateSaveData]);
 

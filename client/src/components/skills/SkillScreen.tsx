@@ -5,6 +5,7 @@ import { SKILLS } from '@shared/data';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import axios from 'axios';
+import { toast } from '@/components/common/Toast';
 
 function SkillScreen() {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ function SkillScreen() {
           updateSaveData(res.data.saveData);
         }
       } catch (err: any) {
-        alert(err.response?.data?.message || '스킬 강화에 실패했습니다.');
+        toast.error(err.response?.data?.message || '스킬 강화에 실패했습니다.');
       } finally {
         setUpgrading(null);
       }

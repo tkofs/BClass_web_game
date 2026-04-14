@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
+import { ToastContainer, ConfirmModal } from './components/common/Toast';
 import AuthScreen from './components/auth/AuthScreen';
 import CharacterSelect from './components/auth/CharacterSelect';
 import HomeScreen from './components/home/HomeScreen';
@@ -24,6 +25,9 @@ function App() {
   }, [restoreSession]);
 
   return (
+    <>
+    <ToastContainer />
+    <ConfirmModal />
     <Routes>
       <Route path="/" element={<AuthScreen />} />
       <Route path="/select" element={<CharacterSelect />} />
@@ -41,6 +45,7 @@ function App() {
       <Route path="/artifacts" element={<ArtifactScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
 

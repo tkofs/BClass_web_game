@@ -5,6 +5,7 @@ import { ARTIFACTS } from '@shared/data';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import axios from 'axios';
+import { toast } from '@/components/common/Toast';
 
 function ArtifactScreen() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ function ArtifactScreen() {
         updateSaveData(res.data.saveData);
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || '업그레이드 실패');
+      toast.error(err.response?.data?.message || '업그레이드 실패');
     }
   }, [updateSaveData]);
 

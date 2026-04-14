@@ -5,6 +5,7 @@ import { ACHIEVEMENTS, TITLES } from '@shared/data';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import axios from 'axios';
+import { toast } from '@/components/common/Toast';
 
 function AchievementScreen() {
   const navigate = useNavigate();
@@ -45,7 +46,7 @@ function AchievementScreen() {
       const msg = axios.isAxiosError(err) && err.response?.data?.message
         ? err.response.data.message
         : '칭호 장착에 실패했습니다.';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setTitleLoading(null);
     }

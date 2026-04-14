@@ -7,6 +7,7 @@ import type { ResolvedItem, EquippedSlotInfo } from '@/hooks/useInventory';
 import type { Item, ItemRarity } from '@shared/types';
 import { ITEMS, SETS, CHARACTERS, GEMS, TITLES, PETS, ARTIFACTS } from '@shared/data';
 import axios from 'axios';
+import { toast, confirm } from '@/components/common/Toast';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Modal from '@/components/common/Modal';
@@ -680,8 +681,8 @@ function ItemDetailModal({
             </Button>
           )}
           {item.sellPrice > 0 && item.type !== 'material' && (
-            <Button variant="danger" size="sm" onClick={() => {
-              if (window.confirm(`${item.name}을(를) ${item.sellPrice}G에 판매하시겠습니까?`)) {
+            <Button variant="danger" size="sm" onClick={async () => {
+              if (await confirm(`${item.name}을(를) ${item.sellPrice}G에 판매하시겠습니까?`)) {
                 onSell(item.id); onClose();
               }
             }} className="flex-1">
@@ -798,7 +799,7 @@ function InventoryScreen() {
         setSelectedEquipSlot((prev) => prev ? { ...prev } : null);
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || '보석 장착 실패');
+      toast.error(err.response?.data?.message || '보석 장착 실패');
     }
   }, [updateSaveData]);
 
@@ -811,7 +812,7 @@ function InventoryScreen() {
         setSelectedEquipSlot((prev) => prev ? { ...prev } : null);
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || '보석 제거 실패');
+      toast.error(err.response?.data?.message || '보석 제거 실패');
     }
   }, [updateSaveData]);
 
@@ -1181,9 +1182,9 @@ function InventoryScreen() {
             if (res.data.success) {
               updateSaveData(res.data.saveData);
               if (res.data.enhanced) {
-                alert(`강화 성공! (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.success(`강화 성공! (${res.data.goldSpent.toLocaleString()}G 소모)`);
               } else {
-                alert(`강화 실패... (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.error(`강화 실패... (${res.data.goldSpent.toLocaleString()}G 소모)`);
               }
               // Re-select to refresh info
               const updated = res.data.saveData;
@@ -1192,7 +1193,7 @@ function InventoryScreen() {
               }
             }
           } catch (err: any) {
-            alert(err.response?.data?.message || '강화 실패');
+            toast.error(err.response?.data?.message || '강화 실패');
           }
         }}
       />
@@ -1213,9 +1214,9 @@ function InventoryScreen() {
             if (res.data.success) {
               updateSaveData(res.data.saveData);
               if (res.data.enhanced) {
-                alert(`강화 성공! (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.success(`강화 성공! (${res.data.goldSpent.toLocaleString()}G 소모)`);
               } else {
-                alert(`강화 실패... (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.error(`강화 실패... (${res.data.goldSpent.toLocaleString()}G 소모)`);
               }
               // Re-select to refresh info
               if (res.data.saveData) {
@@ -1227,7 +1228,7 @@ function InventoryScreen() {
               }
             }
           } catch (err: any) {
-            alert(err.response?.data?.message || '강화 실패');
+            toast.error(err.response?.data?.message || '강화 실패');
           }
         }}
       />

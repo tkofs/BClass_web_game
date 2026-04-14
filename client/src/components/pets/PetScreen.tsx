@@ -5,6 +5,7 @@ import { PETS } from '@shared/data';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import axios from 'axios';
+import { toast, confirm } from '@/components/common/Toast';
 
 const rarityTextColors: Record<string, string> = {
   common: 'text-gray-400',
@@ -78,7 +79,7 @@ function PetScreen() {
     const pet = PETS.find((p) => p.id === petId);
     if (!pet) return;
 
-    const confirmed = window.confirm(
+    const confirmed = await confirm(
       `${pet.name}을(를) 소환하시겠습니까?\n비용: ${pet.summonCost} 젬`
     );
     if (!confirmed) return;
@@ -93,7 +94,7 @@ function PetScreen() {
       const message = axios.isAxiosError(err) && err.response?.data?.message
         ? err.response.data.message
         : '소환에 실패했습니다.';
-      alert(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -112,7 +113,7 @@ function PetScreen() {
       const message = axios.isAxiosError(err) && err.response?.data?.message
         ? err.response.data.message
         : '장착에 실패했습니다.';
-      alert(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

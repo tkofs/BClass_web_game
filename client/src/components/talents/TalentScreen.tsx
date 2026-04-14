@@ -6,6 +6,7 @@ import type { TalentNode } from '@shared/data/talents';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import axios from 'axios';
+import { toast, confirm } from '@/components/common/Toast';
 
 const BRANCH_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   offense: { label: '공격', color: 'text-red-400', icon: '\u2694' },
@@ -56,14 +57,14 @@ function TalentScreen() {
       const msg = axios.isAxiosError(err) && err.response?.data?.message
         ? err.response.data.message
         : '특성 투자에 실패했습니다.';
-      alert(msg);
+      toast.error(msg);
     } finally {
       setLoading(null);
     }
   }, [updateSaveData]);
 
   const handleReset = useCallback(async () => {
-    const confirmed = window.confirm(
+    const confirmed = await confirm(
       '특성 포인트를 초기화하시겠습니까?\n비용: 10,000 골드',
     );
     if (!confirmed) return;
@@ -76,7 +77,7 @@ function TalentScreen() {
       const msg = axios.isAxiosError(err) && err.response?.data?.message
         ? err.response.data.message
         : '초기화에 실패했습니다.';
-      alert(msg);
+      toast.error(msg);
     }
   }, [updateSaveData]);
 
