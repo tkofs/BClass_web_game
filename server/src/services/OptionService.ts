@@ -98,38 +98,50 @@ export function getRerollCost(rarity: string): number {
   return costs[rarity] ?? 10000;
 }
 
-/** Reroll with locked indices — locked options stay, rest get rerolled */
+/** Reroll with locked indices — locked options stay at their position, rest get rerolled */
 export function rerollWithLocks(rarity: string, currentOptions: RandomOption[], lockedIndices: number[]): RandomOption[] {
-  const newOptions: RandomOption[] = [];
+  const lockedSet = new Set(lockedIndices);
   const usedStats = new Set<string>();
 
-  // Keep locked options
+  // Collect locked stats
   for (const idx of lockedIndices) {
     if (idx >= 0 && idx < currentOptions.length) {
-      newOptions.push(currentOptions[idx]);
       usedStats.add(currentOptions[idx].stat);
     }
   }
 
-  // Determine how many new options to generate
+  // Determine total option count
   const count = getOptionCount(rarity);
-  const needed = count - newOptions.length;
 
+  // Build pool for new options
   const allOptions: OptionDef[] = [...OPTION_POOL.offensive, ...OPTION_POOL.defensive, ...OPTION_POOL.utility];
   if (rarity === 'epic' || rarity === 'legendary') allOptions.push(...OPTION_POOL.special);
-  const available = allOptions.filter((o) => o.ranges[rarity as RarityKey] && !usedStats.has(o.stat));
 
-  for (let i = 0; i < needed && available.length > 0; i++) {
-    const candidates = available.filter((o) => !usedStats.has(o.stat));
+  // Generate new options for unlocked slots
+  const newRolls: RandomOption[] = [];
+  const needed = count - lockedSet.size;
+  for (let i = 0; i < needed; i++) {
+    const candidates = allOptions.filter((o) => o.ranges[rarity as RarityKey] && !usedStats.has(o.stat));
     if (candidates.length === 0) break;
     const picked = candidates[Math.floor(Math.random() * candidates.length)];
     const range = picked.ranges[rarity as RarityKey];
     if (!range) continue;
-    newOptions.push({ stat: picked.stat, value: rollValue(range[0], range[1]) });
+    newRolls.push({ stat: picked.stat, value: rollValue(range[0], range[1]) });
     usedStats.add(picked.stat);
   }
 
-  return newOptions;
+  // Build result: locked options keep position, unlocked get new values
+  const result: RandomOption[] = [];
+  let newIdx = 0;
+  for (let i = 0; i < count; i++) {
+    if (lockedSet.has(i) && i < currentOptions.length) {
+      result.push(currentOptions[i]);
+    } else if (newIdx < newRolls.length) {
+      result.push(newRolls[newIdx++]);
+    }
+  }
+
+  return result;
 }
 
 /** Get range [min, max] for a stat at given rarity */

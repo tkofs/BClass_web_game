@@ -254,28 +254,18 @@ export function addItemSmart(
     return addItem(saveData, itemId, quantity);
   }
 
-  // Equipment: check if already owned
+  // Equipment: check if already owned → auto-dismantle into enhancement stones
   if (ownsEquipment(saveData, itemId)) {
-    // Feed into enhancement
-    const entry = saveData.enhanceLevels[itemId] ?? { level: 0, exp: 0 };
-    entry.exp += quantity;
-
-    // Process level-ups
-    while (entry.level < MAX_ENHANCE_LEVEL) {
-      const cost = enhanceCost(entry.level + 1);
-      if (entry.exp < cost) break;
-      entry.exp -= cost;
-      entry.level += 1;
-    }
-
-    // Cap at max level
-    if (entry.level >= MAX_ENHANCE_LEVEL) {
-      entry.level = MAX_ENHANCE_LEVEL;
-      entry.exp = 0;
-    }
-
-    saveData.enhanceLevels[itemId] = entry;
-    return { success: true, enhanced: true };
+    const DISMANTLE_STONES: Record<string, string> = {
+      common: 'enhance_stone_common',
+      uncommon: 'enhance_stone_uncommon',
+      rare: 'enhance_stone_rare',
+      epic: 'enhance_stone_epic',
+      legendary: 'enhance_stone_legendary',
+    };
+    const stoneId = DISMANTLE_STONES[itemDef.rarity] ?? 'enhance_stone_common';
+    addItem(saveData, stoneId, quantity);
+    return { success: true, enhanced: false, dismantled: true };
   }
 
   // Equipment, first copy: add to inventory normally and generate random options
