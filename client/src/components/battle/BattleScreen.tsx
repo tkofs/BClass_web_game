@@ -499,9 +499,10 @@ function BattleScreen() {
           />
         </div>
         <div className="flex gap-3 text-[11px]">
-          <span className="text-red-400">ATK {battleState.player.attack}</span>
-          <span className="text-blue-400">DEF {battleState.player.defense}</span>
+          <span className="text-red-400">ATK {battleState.player.attack.toLocaleString()}</span>
+          <span className="text-blue-400">DEF {battleState.player.defense.toLocaleString()}</span>
           <span className="text-green-400">SPD {battleState.player.speed}</span>
+          <span className="text-gray-600 text-[9px]">(실제 전투 수치)</span>
         </div>
       </div>
 
