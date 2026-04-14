@@ -14,6 +14,7 @@ const rarityTextColors: Record<string, string> = {
   rare: 'text-blue-400',
   epic: 'text-purple-400',
   legendary: 'text-yellow-400',
+  mythic: 'text-rose-400',
 };
 
 const rarityBorders: Record<string, string> = {
@@ -22,6 +23,7 @@ const rarityBorders: Record<string, string> = {
   rare: 'border-blue-500',
   epic: 'border-purple-500',
   legendary: 'border-yellow-500',
+  mythic: 'border-rose-500',
 };
 
 const rarityLabels: Record<string, string> = {
@@ -30,6 +32,7 @@ const rarityLabels: Record<string, string> = {
   rare: '희귀',
   epic: '영웅',
   legendary: '전설',
+  mythic: '신화',
 };
 
 const typeLabels: Record<string, string> = {

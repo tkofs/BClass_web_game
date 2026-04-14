@@ -20,6 +20,7 @@ const rarityColors: Record<string, string> = {
   rare: 'border-blue-500',
   epic: 'border-purple-500',
   legendary: 'border-yellow-500',
+  mythic: 'border-rose-500',
 };
 
 const rarityBgColors: Record<string, string> = {
@@ -28,6 +29,7 @@ const rarityBgColors: Record<string, string> = {
   rare: 'bg-blue-500/10',
   epic: 'bg-purple-500/10',
   legendary: 'bg-yellow-500/10',
+  mythic: 'bg-rose-500/10',
 };
 
 const rarityLabels: Record<string, string> = {
@@ -36,6 +38,7 @@ const rarityLabels: Record<string, string> = {
   rare: '희귀',
   epic: '영웅',
   legendary: '전설',
+  mythic: '신화',
 };
 
 const rarityTextColors: Record<string, string> = {
@@ -44,6 +47,7 @@ const rarityTextColors: Record<string, string> = {
   rare: 'text-blue-400',
   epic: 'text-purple-400',
   legendary: 'text-yellow-400',
+  mythic: 'text-rose-400',
 };
 
 const typeLabels: Record<string, string> = {
@@ -132,23 +136,24 @@ const REROLL_COSTS: Record<string, number> = {
   rare: 20000,
   epic: 100000,
   legendary: 500000,
+  mythic: 2000000,
 };
 
 // Option ranges (mirrored from server OptionService)
 const OPTION_RANGES: Record<string, Record<string, [number, number]>> = {
-  atk_flat: { common: [5,50], uncommon: [10,100], rare: [20,200], epic: [50,500], legendary: [100,1000] },
-  atk_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,12], legendary: [8,20] },
-  crit_rate: { common: [1,2], uncommon: [1,3], rare: [2,5], epic: [3,7], legendary: [5,10] },
-  crit_damage: { common: [2,5], uncommon: [3,8], rare: [5,12], epic: [8,20], legendary: [10,30] },
-  def_flat: { common: [5,50], uncommon: [10,100], rare: [20,200], epic: [50,500], legendary: [100,1000] },
-  hp_flat: { common: [10,100], uncommon: [20,200], rare: [50,500], epic: [100,1000], legendary: [200,2000] },
-  hp_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,12], legendary: [8,20] },
-  gold_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,10], legendary: [5,15] },
-  exp_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,10], legendary: [5,15] },
-  speed: { common: [1,2], uncommon: [1,3], rare: [2,5], epic: [3,7], legendary: [5,10] },
-  lifesteal: { epic: [1,3], legendary: [2,5] },
-  reflect: { epic: [2,5], legendary: [3,8] },
-  hp_regen: { epic: [0.5,1], legendary: [1,2] },
+  atk_flat: { common: [5,50], uncommon: [10,100], rare: [20,200], epic: [50,500], legendary: [100,1000], mythic: [150,1500] },
+  atk_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,12], legendary: [8,20], mythic: [10,30] },
+  crit_rate: { common: [1,2], uncommon: [1,3], rare: [2,5], epic: [3,7], legendary: [5,10], mythic: [7,15] },
+  crit_damage: { common: [2,5], uncommon: [3,8], rare: [5,12], epic: [8,20], legendary: [10,30], mythic: [15,40] },
+  def_flat: { common: [5,50], uncommon: [10,100], rare: [20,200], epic: [50,500], legendary: [100,1000], mythic: [150,1500] },
+  hp_flat: { common: [10,100], uncommon: [20,200], rare: [50,500], epic: [100,1000], legendary: [200,2000], mythic: [300,3000] },
+  hp_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,12], legendary: [8,20], mythic: [10,30] },
+  gold_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,10], legendary: [5,15], mythic: [8,20] },
+  exp_percent: { common: [1,3], uncommon: [2,5], rare: [3,8], epic: [5,10], legendary: [5,15], mythic: [8,20] },
+  speed: { common: [1,2], uncommon: [1,3], rare: [2,5], epic: [3,7], legendary: [5,10], mythic: [7,15] },
+  lifesteal: { epic: [1,3], legendary: [2,5], mythic: [3,8] },
+  reflect: { epic: [2,5], legendary: [3,8], mythic: [5,12] },
+  hp_regen: { epic: [0.5,1], legendary: [1,2], mythic: [2,4] },
 };
 
 function getQuality(stat: string, rarity: string, value: number): { percent: number; label: string; color: string } {
@@ -417,6 +422,8 @@ function getSocketCount(rarity: ItemRarity): number {
     case 'epic':
     case 'legendary':
       return 3;
+    case 'mythic':
+      return 4;
     default:
       return 1;
   }
@@ -552,7 +559,7 @@ function EquippedDetailModal({
   const { updateSaveData } = useAuth();
   if (!slot?.data) return null;
 
-  const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000 };
+  const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000, mythic: 200000 };
   const target = slot.enhanceLevel + 1;
   const enhanceCostGold = (RARITY_BASE[slot.data.rarity] ?? 1000) * target * target;
   const enhanceRate = target <= 5 ? 50 : Math.max(5, 50 - (target - 5) * 1.5);
@@ -634,6 +641,7 @@ function EquippedDetailModal({
         {/* Enhancement stone usage */}
         {canEnhance && (() => {
           const stoneTypes = [
+            { id: 'enhance_stone_mythic', name: '신화', exp: 500, color: 'text-rose-400' },
             { id: 'enhance_stone_legendary', name: '전설', exp: 100, color: 'text-yellow-400' },
             { id: 'enhance_stone_epic', name: '영웅', exp: 30, color: 'text-purple-400' },
             { id: 'enhance_stone_rare', name: '희귀', exp: 10, color: 'text-blue-400' },
@@ -879,6 +887,7 @@ function ItemDetailModal({
         {/* Enhancement stone usage for inventory items */}
         {isEquipType && enhanceLevel < 99 && (() => {
           const stoneTypes = [
+            { id: 'enhance_stone_mythic', name: '신화', exp: 500, color: 'text-rose-400' },
             { id: 'enhance_stone_legendary', name: '전설', exp: 100, color: 'text-yellow-400' },
             { id: 'enhance_stone_epic', name: '영웅', exp: 30, color: 'text-purple-400' },
             { id: 'enhance_stone_rare', name: '희귀', exp: 10, color: 'text-blue-400' },
@@ -1481,7 +1490,7 @@ function InventoryScreen() {
           const rarity = selectedItem.data.rarity;
           const level = getEnhanceLevel(selectedItem.data.id);
           if (level >= 99) return null;
-          const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000 };
+          const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000, mythic: 200000 };
           const target = level + 1;
           const cost = (RARITY_BASE[rarity] ?? 1000) * target * target;
           const rate = target <= 5 ? 50 : Math.max(5, 50 - (target - 5) * 1.5);

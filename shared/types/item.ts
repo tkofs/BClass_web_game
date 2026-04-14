@@ -17,7 +17,7 @@ export interface Item {
 import type { CharacterClass } from './character';
 
 export type ItemType = 'weapon' | 'shield' | 'offhand' | 'helm' | 'shoulders' | 'chest' | 'gloves' | 'belt' | 'legs' | 'boots' | 'accessory' | 'consumable' | 'material';
-export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
 export interface ItemStats {
   attack: number;

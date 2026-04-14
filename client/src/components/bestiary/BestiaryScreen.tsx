@@ -49,6 +49,7 @@ const itemMap = new Map<string, Item>(ITEMS.map((item) => [item.id, item]));
 const RARITY_COLOR: Record<string, string> = {
   epic: 'text-purple-400',
   legendary: 'text-yellow-400',
+  mythic: 'text-rose-400',
 };
 
 const DropHistoryEntry = React.memo(function DropHistoryEntry({

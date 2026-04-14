@@ -104,7 +104,7 @@ const BattleResult = React.memo(function BattleResult({
                     const item = ITEMS.find((i) => i.id === drop.itemId);
                     return (
                       <div key={drop.itemId} className="flex justify-between text-sm panel py-1 px-2">
-                        <span className={`${item?.rarity === 'legendary' ? 'text-yellow-400 font-bold' : 'text-gray-200'}`}>
+                        <span className={`${item?.rarity === 'mythic' ? 'text-rose-400 font-bold' : item?.rarity === 'legendary' ? 'text-yellow-400 font-bold' : 'text-gray-200'}`}>
                           {item?.name ?? drop.itemId}
                         </span>
                         <span className="text-gray-400">x{drop.quantity}</span>

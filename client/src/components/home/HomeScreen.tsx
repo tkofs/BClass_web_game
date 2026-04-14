@@ -666,6 +666,11 @@ function HomeScreen() {
           <p className="text-lg font-bold">랭킹</p>
           <p className="text-xs text-gray-500 mt-1">순위를 확인하세요</p>
         </Card>
+        <Card hover onClick={() => navigate('/gacha')} className="text-center py-6 border-rose-500/30">
+          <div className="text-3xl mb-2 text-rose-400">&#127183;</div>
+          <p className="text-lg font-bold text-rose-400">소환</p>
+          <p className="text-xs text-gray-500 mt-1">신화 장비를 뽑으세요</p>
+        </Card>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import PetScreen from './components/pets/PetScreen';
 import TalentScreen from './components/talents/TalentScreen';
 import RankingScreen from './components/ranking/RankingScreen';
 import ArtifactScreen from './components/artifacts/ArtifactScreen';
+import GachaScreen from './components/gacha/GachaScreen';
 
 function App() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
@@ -43,6 +44,7 @@ function App() {
       <Route path="/talents" element={<TalentScreen />} />
       <Route path="/ranking" element={<RankingScreen />} />
       <Route path="/artifacts" element={<ArtifactScreen />} />
+      <Route path="/gacha" element={<GachaScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </>

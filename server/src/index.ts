@@ -12,6 +12,7 @@ import dailyRouter from './routes/daily';
 import craftRouter from './routes/craft';
 import petsRouter from './routes/pets';
 import rankingRouter from './routes/ranking';
+import gachaRouter from './routes/gacha';
 
 // ────────────────────────────────────────────────────────────
 // App setup
@@ -58,6 +59,7 @@ app.use('/api/daily', dailyRouter);
 app.use('/api/craft', craftRouter);
 app.use('/api/pets', petsRouter);
 app.use('/api/ranking', rankingRouter);
+app.use('/api/gacha', gachaRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

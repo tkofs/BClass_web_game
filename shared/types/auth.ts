@@ -32,6 +32,7 @@ export interface SaveData {
   ownedPets: string[];     // owned pet IDs
   activePet: string;       // equipped pet ID
   itemOptions: Record<string, RandomOption[]>;  // itemId -> random options
+  gachaPity: number;  // pulls since last mythic drop
   blessings: { type: string; expiresAt: string }[];
   appearance: { color: string };
   createdAt: string;

@@ -1,6 +1,6 @@
 import type { RandomOption } from '../../../shared/types/item';
 
-type RarityKey = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+type RarityKey = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
 interface OptionDef {
   stat: string;
@@ -10,25 +10,25 @@ interface OptionDef {
 
 const OPTION_POOL: Record<string, OptionDef[]> = {
   offensive: [
-    { stat: 'atk_flat', label: '공격력', ranges: { common: [5, 50], uncommon: [10, 100], rare: [20, 200], epic: [50, 500], legendary: [100, 1000] } },
-    { stat: 'atk_percent', label: '공격력%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 12], legendary: [8, 20] } },
-    { stat: 'crit_rate', label: '크리율%', ranges: { common: [1, 2], uncommon: [1, 3], rare: [2, 5], epic: [3, 7], legendary: [5, 10] } },
-    { stat: 'crit_damage', label: '크리뎀%', ranges: { common: [2, 5], uncommon: [3, 8], rare: [5, 12], epic: [8, 20], legendary: [10, 30] } },
+    { stat: 'atk_flat', label: '공격력', ranges: { common: [5, 50], uncommon: [10, 100], rare: [20, 200], epic: [50, 500], legendary: [100, 1000], mythic: [150, 1500] } },
+    { stat: 'atk_percent', label: '공격력%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 12], legendary: [8, 20], mythic: [10, 30] } },
+    { stat: 'crit_rate', label: '크리율%', ranges: { common: [1, 2], uncommon: [1, 3], rare: [2, 5], epic: [3, 7], legendary: [5, 10], mythic: [7, 15] } },
+    { stat: 'crit_damage', label: '크리뎀%', ranges: { common: [2, 5], uncommon: [3, 8], rare: [5, 12], epic: [8, 20], legendary: [10, 30], mythic: [15, 40] } },
   ],
   defensive: [
-    { stat: 'def_flat', label: '방어력', ranges: { common: [5, 50], uncommon: [10, 100], rare: [20, 200], epic: [50, 500], legendary: [100, 1000] } },
-    { stat: 'hp_flat', label: 'HP', ranges: { common: [10, 100], uncommon: [20, 200], rare: [50, 500], epic: [100, 1000], legendary: [200, 2000] } },
-    { stat: 'hp_percent', label: 'HP%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 12], legendary: [8, 20] } },
+    { stat: 'def_flat', label: '방어력', ranges: { common: [5, 50], uncommon: [10, 100], rare: [20, 200], epic: [50, 500], legendary: [100, 1000], mythic: [150, 1500] } },
+    { stat: 'hp_flat', label: 'HP', ranges: { common: [10, 100], uncommon: [20, 200], rare: [50, 500], epic: [100, 1000], legendary: [200, 2000], mythic: [300, 3000] } },
+    { stat: 'hp_percent', label: 'HP%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 12], legendary: [8, 20], mythic: [10, 30] } },
   ],
   utility: [
-    { stat: 'gold_percent', label: '골드%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 10], legendary: [5, 15] } },
-    { stat: 'exp_percent', label: '경험치%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 10], legendary: [5, 15] } },
-    { stat: 'speed', label: '속도', ranges: { common: [1, 2], uncommon: [1, 3], rare: [2, 5], epic: [3, 7], legendary: [5, 10] } },
+    { stat: 'gold_percent', label: '골드%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 10], legendary: [5, 15], mythic: [8, 20] } },
+    { stat: 'exp_percent', label: '경험치%', ranges: { common: [1, 3], uncommon: [2, 5], rare: [3, 8], epic: [5, 10], legendary: [5, 15], mythic: [8, 20] } },
+    { stat: 'speed', label: '속도', ranges: { common: [1, 2], uncommon: [1, 3], rare: [2, 5], epic: [3, 7], legendary: [5, 10], mythic: [7, 15] } },
   ],
   special: [
-    { stat: 'lifesteal', label: '흡혈%', ranges: { epic: [1, 3], legendary: [2, 5] } },
-    { stat: 'reflect', label: '반사%', ranges: { epic: [2, 5], legendary: [3, 8] } },
-    { stat: 'hp_regen', label: '턴HP회복%', ranges: { epic: [0.5, 1], legendary: [1, 2] } },
+    { stat: 'lifesteal', label: '흡혈%', ranges: { epic: [1, 3], legendary: [2, 5], mythic: [3, 8] } },
+    { stat: 'reflect', label: '반사%', ranges: { epic: [2, 5], legendary: [3, 8], mythic: [5, 12] } },
+    { stat: 'hp_regen', label: '턴HP회복%', ranges: { epic: [0.5, 1], legendary: [1, 2], mythic: [2, 4] } },
   ],
 };
 
@@ -39,6 +39,7 @@ function getOptionCount(rarity: string): number {
     case 'rare': return 2 + (Math.random() < 0.5 ? 1 : 0); // 2-3
     case 'epic': return 3;
     case 'legendary': return 4;
+    case 'mythic': return 5;
     default: return 1;
   }
 }
@@ -60,8 +61,8 @@ export function generateOptions(rarity: string): RandomOption[] {
     ...OPTION_POOL.utility,
   ];
 
-  // Special options only for epic/legendary
-  if (rarity === 'epic' || rarity === 'legendary') {
+  // Special options only for epic/legendary/mythic
+  if (rarity === 'epic' || rarity === 'legendary' || rarity === 'mythic') {
     allOptions.push(...OPTION_POOL.special);
   }
 
@@ -94,6 +95,7 @@ export function getRerollCost(rarity: string): number {
     rare: 20000,
     epic: 100000,
     legendary: 500000,
+    mythic: 2000000,
   };
   return costs[rarity] ?? 10000;
 }
@@ -115,7 +117,7 @@ export function rerollWithLocks(rarity: string, currentOptions: RandomOption[], 
 
   // Build pool for new options
   const allOptions: OptionDef[] = [...OPTION_POOL.offensive, ...OPTION_POOL.defensive, ...OPTION_POOL.utility];
-  if (rarity === 'epic' || rarity === 'legendary') allOptions.push(...OPTION_POOL.special);
+  if (rarity === 'epic' || rarity === 'legendary' || rarity === 'mythic') allOptions.push(...OPTION_POOL.special);
 
   // Generate new options for unlocked slots
   const newRolls: RandomOption[] = [];

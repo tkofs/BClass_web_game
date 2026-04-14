@@ -134,6 +134,7 @@ export function createNewGame(
     ownedPets: [],
     activePet: '',
     itemOptions: {},
+    gachaPity: 0,
     blessings: [],
     appearance: { color: '#8B5CF6' },
     createdAt: now,

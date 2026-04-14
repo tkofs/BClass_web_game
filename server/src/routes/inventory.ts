@@ -232,6 +232,8 @@ function getSocketCount(rarity: ItemRarity): number {
     case 'epic':
     case 'legendary':
       return 3;
+    case 'mythic':
+      return 4;
     default:
       return 1;
   }

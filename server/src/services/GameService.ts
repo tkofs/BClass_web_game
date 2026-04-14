@@ -262,6 +262,7 @@ export function addItemSmart(
       rare: 'enhance_stone_rare',
       epic: 'enhance_stone_epic',
       legendary: 'enhance_stone_legendary',
+      mythic: 'enhance_stone_legendary',
     };
     const stoneId = DISMANTLE_STONES[itemDef.rarity] ?? 'enhance_stone_common';
     addItem(saveData, stoneId, quantity);
@@ -307,6 +308,7 @@ const RARITY_BASE_GOLD: Record<string, number> = {
   rare: 2000,
   epic: 10000,
   legendary: 50000,
+  mythic: 100000,
 };
 
 /** Gold cost for enhancing to targetLevel */

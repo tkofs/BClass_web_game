@@ -12,6 +12,7 @@ const rarityTextColors: Record<string, string> = {
   rare: 'text-blue-400',
   epic: 'text-purple-400',
   legendary: 'text-yellow-400',
+  mythic: 'text-rose-400',
 };
 
 const rarityBorders: Record<string, string> = {
@@ -19,6 +20,7 @@ const rarityBorders: Record<string, string> = {
   rare: 'border-blue-500',
   epic: 'border-purple-500',
   legendary: 'border-yellow-500',
+  mythic: 'border-rose-500',
 };
 
 const rarityBgGlow: Record<string, string> = {
@@ -26,6 +28,7 @@ const rarityBgGlow: Record<string, string> = {
   rare: 'shadow-blue-500/20 shadow-lg',
   epic: 'shadow-purple-500/20 shadow-lg',
   legendary: 'shadow-yellow-500/30 shadow-xl',
+  mythic: 'shadow-rose-500/30 shadow-xl',
 };
 
 const rarityLabels: Record<string, string> = {
@@ -33,6 +36,7 @@ const rarityLabels: Record<string, string> = {
   rare: '레어',
   epic: '에픽',
   legendary: '전설',
+  mythic: '신화',
 };
 
 const petEmojis: Record<string, string> = {
