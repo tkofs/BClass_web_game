@@ -170,6 +170,22 @@ function ShopScreen() {
     }
   }, [updateSaveData, showMessage]);
 
+  const handleRefreshShop = useCallback(async () => {
+    try {
+      const res = await axios.post('/api/shop/refresh');
+      if (res.data.success) {
+        setEquipment(res.data.equipment);
+        setRefreshAt(res.data.refreshAt);
+        setGold(res.data.gold);
+        setGems(res.data.gems ?? 0);
+        if (res.data.saveData) updateSaveData(res.data.saveData);
+        showMessage('장비 상점이 갱신되었습니다!', 'success');
+      }
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || '갱신 실패', 'error');
+    }
+  }, [updateSaveData, showMessage]);
+
   const handleBack = useCallback(() => navigate('/home'), [navigate]);
 
   if (loading) return <div className="text-center py-20 text-gray-500">로딩 중...</div>;
@@ -258,7 +274,17 @@ function ShopScreen() {
       {shopTab === 'equip' && <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-gray-300">장비 상점</h2>
-          <span className="text-xs text-gray-500">갱신까지: {countdown}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">갱신까지: {countdown}</span>
+            <button
+              type="button"
+              onClick={handleRefreshShop}
+              disabled={gems < 50}
+              className="px-2 py-1 text-[10px] font-bold rounded bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              즉시 갱신 (50젬)
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {equipment.map((shopItem, idx) => {

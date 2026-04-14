@@ -279,6 +279,8 @@ function HomeScreen() {
   const handlePets = useCallback(() => navigate('/pets'), [navigate]);
   const handleArtifacts = useCallback(() => navigate('/artifacts'), [navigate]);
 
+  const [blessingLoading, setBlessingLoading] = useState<string | null>(null);
+  const [blessingCountdowns, setBlessingCountdowns] = useState<Record<string, string>>({});
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorPickerRef = useRef<HTMLDivElement>(null);
   const appearanceColor = saveData?.appearance?.color ?? '#8B5CF6';
@@ -346,6 +348,46 @@ function HomeScreen() {
     }
   }, [saveData, updateSaveData]);
 
+  const handleBuyBlessing = useCallback(async (blessingType: string) => {
+    setBlessingLoading(blessingType);
+    try {
+      const res = await axios.post('/api/game/buy-blessing', { blessingType });
+      if (res.data.success && res.data.saveData) {
+        updateSaveData(res.data.saveData);
+        toast.success(res.data.message);
+      }
+    } catch (err: unknown) {
+      const msg = axios.isAxiosError(err) && err.response?.data?.message
+        ? err.response.data.message
+        : '축복 구매에 실패했습니다.';
+      toast.error(msg);
+    } finally {
+      setBlessingLoading(null);
+    }
+  }, [updateSaveData]);
+
+  // Blessing countdown timer
+  useEffect(() => {
+    const blessings = saveData?.blessings ?? [];
+    if (blessings.length === 0) return;
+    const tick = () => {
+      const now = Date.now();
+      const result: Record<string, string> = {};
+      for (const b of blessings) {
+        const diff = new Date(b.expiresAt).getTime() - now;
+        if (diff > 0) {
+          const m = Math.floor(diff / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          result[b.type] = `${m}:${String(s).padStart(2, '0')}`;
+        }
+      }
+      setBlessingCountdowns(result);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [saveData?.blessings]);
+
   const handleClaimDaily = useCallback(async () => {
     try {
       const res = await axios.post('/api/daily/claim');
@@ -400,6 +442,38 @@ function HomeScreen() {
           <p className="text-center text-gray-600 text-xs mb-4">오늘의 보상 수령 완료</p>
         )
       )}
+
+      {/* Blessings section */}
+      <Card className="mb-4 p-3">
+        <h3 className="text-sm font-bold text-purple-400 mb-2">&#10024; 축복 (30분간 효과)</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { type: 'exp_2x', label: '경험치 2배', icon: '&#128218;', cost: 100 },
+            { type: 'gold_2x', label: '골드 2배', icon: '&#128176;', cost: 100 },
+            { type: 'drop_2x', label: '드랍 2배', icon: '&#127808;', cost: 100 },
+          ] as const).map((blessing) => {
+            const isActive = !!blessingCountdowns[blessing.type];
+            return (
+              <div key={blessing.type} className={`text-center p-2 rounded-lg border ${isActive ? 'border-purple-500 bg-purple-500/10' : 'border-dungeon-border'}`}>
+                <div className="text-lg mb-1" dangerouslySetInnerHTML={{ __html: blessing.icon }} />
+                <p className="text-xs font-bold text-gray-200">{blessing.label}</p>
+                {isActive ? (
+                  <p className="text-xs text-purple-400 font-bold mt-1">{blessingCountdowns[blessing.type]}</p>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={blessingLoading === blessing.type || (saveData?.gems ?? 0) < blessing.cost}
+                    onClick={() => handleBuyBlessing(blessing.type)}
+                    className="mt-1 px-2 py-0.5 text-[10px] font-bold rounded bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {blessingLoading === blessing.type ? '...' : `${blessing.cost} 젬`}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* Character portrait */}
       <div className="flex flex-col items-center mb-6 relative">

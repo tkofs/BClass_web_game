@@ -134,6 +134,7 @@ export function createNewGame(
     ownedPets: [],
     activePet: '',
     itemOptions: {},
+    blessings: [],
     appearance: { color: '#8B5CF6' },
     createdAt: now,
     lastPlayedAt: now,

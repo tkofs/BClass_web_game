@@ -171,7 +171,13 @@ router.post('/prestige', (req: Request, res: Response): void => {
     saveData.level = keptLevel;
     saveData.exp = 0;
     saveData.skillLevels = {};
-    saveData.talentPoints = {};
+    // Preserve premium talent investments during prestige
+    const premTalentIds = new Set(TALENTS.filter((t: TalentNode) => t.premium).map((t: TalentNode) => t.id));
+    const keptPremiumTalents: Record<string, number> = {};
+    for (const [id, level] of Object.entries(saveData.talentPoints ?? {})) {
+      if (premTalentIds.has(id)) keptPremiumTalents[id] = level;
+    }
+    saveData.talentPoints = keptPremiumTalents;
     saveData.abyssFloor = keptAbyssFloor;
 
     // Keep: inventory, equippedItems, enhanceLevels, achievements, bestiary, dropHistory, gold, gems, abyssHighest, artifacts
@@ -271,34 +277,48 @@ router.post(
       }
 
       const tp = saveData.talentPoints ?? {};
-      const totalInvested = Object.values(tp).reduce((sum: number, v: number) => sum + v, 0);
-      const availablePoints = saveData.level - totalInvested;
-
-      if (availablePoints <= 0) {
-        res.status(400).json({ success: false, message: '사용 가능한 특성 포인트가 없습니다' });
-        return;
-      }
-
       const currentLevel = tp[talentId] ?? 0;
       if (currentLevel >= talent.maxLevel) {
         res.status(400).json({ success: false, message: '이미 최대 레벨입니다' });
         return;
       }
 
-      // Check requiredPoints in this branch
-      const branchPoints = Object.entries(tp)
-        .filter(([id]) => {
-          const t = TALENTS.find((tt: TalentNode) => tt.id === id);
-          return t && t.branch === talent.branch;
-        })
-        .reduce((sum: number, [, v]) => sum + (v as number), 0);
+      // Premium talents use gems instead of talent points
+      if (talent.premium) {
+        const PREMIUM_TALENT_GEM_COST = 50;
+        if ((saveData.gems ?? 0) < PREMIUM_TALENT_GEM_COST) {
+          res.status(400).json({ success: false, message: `젬이 부족합니다 (필요: ${PREMIUM_TALENT_GEM_COST})` });
+          return;
+        }
+        saveData.gems -= PREMIUM_TALENT_GEM_COST;
+      } else {
+        const totalInvested = Object.values(tp)
+          .reduce((sum: number, v: number) => sum + v, 0)
+          - Object.entries(tp)
+              .filter(([id]) => { const t2 = TALENTS.find((tt: TalentNode) => tt.id === id); return t2?.premium; })
+              .reduce((sum: number, [, v]) => sum + (v as number), 0);
+        const availablePoints = saveData.level - totalInvested;
 
-      if (branchPoints < talent.requiredPoints) {
-        res.status(400).json({
-          success: false,
-          message: `이 특성을 해금하려면 ${talent.branch} 계열에 ${talent.requiredPoints}포인트 이상 투자해야 합니다 (현재: ${branchPoints})`,
-        });
-        return;
+        if (availablePoints <= 0) {
+          res.status(400).json({ success: false, message: '사용 가능한 특성 포인트가 없습니다' });
+          return;
+        }
+
+        // Check requiredPoints in this branch
+        const branchPoints = Object.entries(tp)
+          .filter(([id]) => {
+            const t = TALENTS.find((tt: TalentNode) => tt.id === id);
+            return t && t.branch === talent.branch && !t.premium;
+          })
+          .reduce((sum: number, [, v]) => sum + (v as number), 0);
+
+        if (branchPoints < talent.requiredPoints) {
+          res.status(400).json({
+            success: false,
+            message: `이 특성을 해금하려면 ${talent.branch} 계열에 ${talent.requiredPoints}포인트 이상 투자해야 합니다 (현재: ${branchPoints})`,
+          });
+          return;
+        }
       }
 
       if (!saveData.talentPoints) saveData.talentPoints = {};
@@ -346,7 +366,13 @@ router.post('/talent-reset', (req: Request, res: Response): void => {
     }
 
     saveData.gold -= RESET_COST;
-    saveData.talentPoints = {};
+    // Preserve premium talent investments (paid with gems)
+    const premiumTalentIds = new Set(TALENTS.filter((t: TalentNode) => t.premium).map((t: TalentNode) => t.id));
+    const preservedPremium: Record<string, number> = {};
+    for (const [id, level] of Object.entries(saveData.talentPoints ?? {})) {
+      if (premiumTalentIds.has(id)) preservedPremium[id] = level;
+    }
+    saveData.talentPoints = preservedPremium;
     AuthService.saveProgress(saveCode, saveData);
 
     res.json({
@@ -476,6 +502,85 @@ router.post(
       });
     } catch (err) {
       console.error('[game/artifact-upgrade]', err);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  },
+);
+
+// ── POST /buy-blessing ──────────────────────────────────────
+const BLESSING_CONFIG: Record<string, { cost: number; durationMs: number; label: string }> = {
+  exp_2x: { cost: 100, durationMs: 30 * 60 * 1000, label: '경험치 2배' },
+  gold_2x: { cost: 100, durationMs: 30 * 60 * 1000, label: '골드 2배' },
+  drop_2x: { cost: 100, durationMs: 30 * 60 * 1000, label: '드랍률 2배' },
+};
+
+router.post(
+  '/buy-blessing',
+  validate([{ name: 'blessingType', type: 'string', minLength: 1 }]),
+  (req: Request, res: Response): void => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ success: false, message: 'Missing authorization' });
+        return;
+      }
+      const token = authHeader.slice(7);
+      const saveCode = AuthService.verifyToken(token);
+      if (!saveCode) {
+        res.status(401).json({ success: false, message: 'Invalid or expired token' });
+        return;
+      }
+
+      const saveData = AuthService.getSaveData(saveCode);
+      if (!saveData) {
+        res.status(404).json({ success: false, message: 'Save data not found' });
+        return;
+      }
+
+      const { blessingType } = req.body;
+      const config = BLESSING_CONFIG[blessingType];
+      if (!config) {
+        res.status(400).json({ success: false, message: 'Invalid blessing type' });
+        return;
+      }
+
+      // Initialize blessings array if missing
+      if (!saveData.blessings) saveData.blessings = [];
+
+      // Check if already active
+      const now = Date.now();
+      const existing = saveData.blessings.find(
+        (b) => b.type === blessingType && new Date(b.expiresAt).getTime() > now,
+      );
+      if (existing) {
+        res.status(400).json({ success: false, message: `${config.label} 축복이 이미 활성 중입니다` });
+        return;
+      }
+
+      if ((saveData.gems ?? 0) < config.cost) {
+        res.status(400).json({ success: false, message: `젬이 부족합니다 (필요: ${config.cost})` });
+        return;
+      }
+
+      saveData.gems -= config.cost;
+
+      // Remove expired blessings of same type, then add new one
+      saveData.blessings = saveData.blessings.filter(
+        (b) => b.type !== blessingType || new Date(b.expiresAt).getTime() > now,
+      );
+      saveData.blessings.push({
+        type: blessingType,
+        expiresAt: new Date(now + config.durationMs).toISOString(),
+      });
+
+      AuthService.saveProgress(saveCode, saveData);
+      res.json({
+        success: true,
+        message: `${config.label} 축복 활성화! (30분)`,
+        saveData,
+      });
+    } catch (err) {
+      console.error('[game/buy-blessing]', err);
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
   },

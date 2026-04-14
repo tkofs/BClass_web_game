@@ -28,7 +28,14 @@ function TalentScreen() {
   const talentPoints = useMemo(() => saveData?.talentPoints ?? {}, [saveData?.talentPoints]);
 
   const totalInvested = useMemo(
-    () => Object.values(talentPoints).reduce((sum, v) => sum + v, 0),
+    () => {
+      let sum = 0;
+      for (const [id, v] of Object.entries(talentPoints)) {
+        const t = TALENTS.find(tt => tt.id === id);
+        if (t && !t.premium) sum += v;
+      }
+      return sum;
+    },
     [talentPoints],
   );
 
@@ -41,7 +48,7 @@ function TalentScreen() {
     const result: Record<string, number> = { offense: 0, defense: 0, utility: 0 };
     for (const [id, level] of Object.entries(talentPoints)) {
       const talent = TALENTS.find((t) => t.id === id);
-      if (talent) result[talent.branch] += level;
+      if (talent && !talent.premium) result[talent.branch] += level;
     }
     return result;
   }, [talentPoints]);
@@ -106,11 +113,63 @@ function TalentScreen() {
         </div>
       </div>
 
+      {/* Premium Talents */}
+      <Card className="mb-6 p-4 border border-purple-500/30 bg-purple-900/10">
+        <h2 className="text-lg font-bold text-purple-400 mb-1">상위 특성 (젬)</h2>
+        <p className="text-xs text-gray-500 mb-3">레벨당 50젬 소모 / 포인트 초기화 영향 없음</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {TALENTS.filter((t) => t.premium).map((talent: TalentNode) => {
+            const currentLevel = talentPoints[talent.id] ?? 0;
+            const isMaxed = currentLevel >= talent.maxLevel;
+            const canInvest = (saveData?.gems ?? 0) >= 50 && !isMaxed;
+            const branchCfg = BRANCH_CONFIG[talent.branch];
+
+            return (
+              <Card
+                key={talent.id}
+                className={`p-3 border ${isMaxed ? 'border-yellow-500/40' : 'border-purple-500/20'}`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className={`font-bold text-sm ${isMaxed ? 'text-yellow-400' : 'text-purple-300'}`}>
+                    {talent.name}
+                  </h3>
+                  <div className="flex items-center gap-1">
+                    <span className={`text-[10px] ${branchCfg.color}`}>{branchCfg.icon}</span>
+                    <span className="text-xs text-gray-400">
+                      {currentLevel}/{talent.maxLevel}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mb-2">{talent.description}</p>
+                <div className="flex gap-0.5 mb-2">
+                  {Array.from({ length: Math.min(talent.maxLevel, 20) }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 flex-1 rounded-full ${
+                        i < currentLevel ? 'bg-purple-400' : 'bg-gray-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={!canInvest || loading === talent.id}
+                  onClick={() => handleInvest(talent.id)}
+                  className="w-full py-1 text-xs font-bold rounded bg-purple-600/30 text-purple-300 hover:bg-purple-600/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loading === talent.id ? '...' : isMaxed ? '최대' : '+1 (50젬)'}
+                </button>
+              </Card>
+            );
+          })}
+        </div>
+      </Card>
+
       {/* Talent branches */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {branches.map((branch) => {
           const config = BRANCH_CONFIG[branch];
-          const talents = TALENTS.filter((t) => t.branch === branch);
+          const talents = TALENTS.filter((t) => t.branch === branch && !t.premium);
           const invested = branchPoints[branch];
 
           return (

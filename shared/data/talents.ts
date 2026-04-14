@@ -6,6 +6,7 @@ export interface TalentNode {
   branch: 'offense' | 'defense' | 'utility';
   effects: { stat: string; valuePerLevel: number }[];
   requiredPoints: number; // total points spent in this branch to unlock
+  premium?: boolean; // gem-only talent
 }
 
 export const TALENTS: TalentNode[] = [
@@ -21,6 +22,10 @@ export const TALENTS: TalentNode[] = [
   { id: 'util_mp', name: '마나 강화', description: 'MP +5% per level', maxLevel: 10, branch: 'utility', effects: [{ stat: 'mpPercent', valuePerLevel: 5 }], requiredPoints: 0 },
   { id: 'util_mpregen', name: '마나 재생', description: '턴당 MP +1% 추가 회복 per level', maxLevel: 5, branch: 'utility', effects: [{ stat: 'mpRegenPercent', valuePerLevel: 1 }], requiredPoints: 5 },
   { id: 'util_gold', name: '재물운', description: '골드 획득 +5% per level', maxLevel: 5, branch: 'utility', effects: [{ stat: 'goldPercent', valuePerLevel: 5 }], requiredPoints: 10 },
+  // Premium talents (gem-only)
+  { id: 'prem_damage', name: '파멸의 의지', description: '전체 데미지 +5% per level (젬 전용)', maxLevel: 20, branch: 'offense', effects: [{ stat: 'totalDmgPercent', valuePerLevel: 5 }], requiredPoints: 0, premium: true },
+  { id: 'prem_reduction', name: '불멸의 육체', description: '전체 피해감소 +3% per level (젬 전용)', maxLevel: 20, branch: 'defense', effects: [{ stat: 'dmgReductionPercent', valuePerLevel: 3 }], requiredPoints: 0, premium: true },
+  { id: 'prem_fortune', name: '운명의 축복', description: '경험치+골드+드랍 각 +2% per level (젬 전용)', maxLevel: 20, branch: 'utility', effects: [{ stat: 'fortunePercent', valuePerLevel: 2 }], requiredPoints: 0, premium: true },
 ];
 
 export interface TalentBonuses {
@@ -33,6 +38,9 @@ export interface TalentBonuses {
   hpRegenPercent: number;
   mpRegenPercent: number;
   goldPercent: number;
+  totalDmgPercent: number;
+  dmgReductionPercent: number;
+  fortunePercent: number;
 }
 
 export function calculateTalentBonuses(talentPoints: Record<string, number>): TalentBonuses {
@@ -46,6 +54,9 @@ export function calculateTalentBonuses(talentPoints: Record<string, number>): Ta
     hpRegenPercent: 0,
     mpRegenPercent: 0,
     goldPercent: 0,
+    totalDmgPercent: 0,
+    dmgReductionPercent: 0,
+    fortunePercent: 0,
   };
 
   for (const talent of TALENTS) {

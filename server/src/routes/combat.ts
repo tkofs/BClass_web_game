@@ -31,6 +31,23 @@ function applyWaveRewards(saveCode: string, battleId: string, source?: string) {
   const rewards = CombatService.calculateRewards(battleId, saveData.characterId);
   if (!rewards) return { rewards: null, levelUp: null };
 
+  // Apply blessing bonuses
+  const blessingNow = Date.now();
+  const activeBlessings = (saveData.blessings ?? []).filter(b => new Date(b.expiresAt).getTime() > blessingNow);
+  for (const b of activeBlessings) {
+    if (b.type === 'exp_2x') rewards.exp = Math.round(rewards.exp * 2);
+    if (b.type === 'gold_2x') rewards.gold = Math.round(rewards.gold * 2);
+    if (b.type === 'drop_2x') {
+      // Duplicate all item drops
+      const extraItems = rewards.items.map(item => ({ ...item }));
+      for (const extra of extraItems) {
+        const existing = rewards.items.find(i => i.itemId === extra.itemId);
+        if (existing) existing.quantity += extra.quantity;
+        else rewards.items.push({ ...extra });
+      }
+    }
+  }
+
   const levelUp = GameService.gainExp(saveData, rewards.exp);
   saveData.gold += rewards.gold;
 
@@ -398,6 +415,16 @@ router.post(
 
           const rewards = CombatService.calculateAbyssRewards(battleId, saveData.characterId);
 
+          // Apply blessing bonuses
+          if (rewards) {
+            const abyssNow = Date.now();
+            const abyssActiveBlessings = (saveData.blessings ?? []).filter(b => new Date(b.expiresAt).getTime() > abyssNow);
+            for (const b of abyssActiveBlessings) {
+              if (b.type === 'exp_2x') rewards.exp = Math.round(rewards.exp * 2);
+              if (b.type === 'gold_2x') rewards.gold = Math.round(rewards.gold * 2);
+            }
+          }
+
           // Advance floor
           saveData.abyssFloor = floor + 1;
           if (saveData.abyssFloor > saveData.abyssHighest) {
@@ -472,6 +499,16 @@ router.post(
         saveData.totalKills += deadEnemies2;
 
         const rewards = CombatService.calculateAbyssRewards(battleId, saveData.characterId);
+
+        // Apply blessing bonuses
+        if (rewards) {
+          const abyssNow2 = Date.now();
+          const abyssActiveBlessings2 = (saveData.blessings ?? []).filter(b => new Date(b.expiresAt).getTime() > abyssNow2);
+          for (const b of abyssActiveBlessings2) {
+            if (b.type === 'exp_2x') rewards.exp = Math.round(rewards.exp * 2);
+            if (b.type === 'gold_2x') rewards.gold = Math.round(rewards.gold * 2);
+          }
+        }
 
         saveData.abyssFloor = floor + 1;
         if (saveData.abyssFloor > saveData.abyssHighest) {

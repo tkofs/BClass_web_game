@@ -535,6 +535,12 @@ export function executePlayerAction(
       const effectiveMultiplier = skill.damageMultiplier * (1 + skillLevel * 0.05);
       damage = calculateDamage(getEffectiveAttack(player), getEffectiveDefense(target), effectiveMultiplier, isCrit, baseCritDmg);
 
+      // Premium talent: totalDmgPercent
+      const talentBonuses = battleTalentMap.get(battleState.id);
+      if (talentBonuses && talentBonuses.totalDmgPercent > 0) {
+        damage = Math.round(damage * (1 + talentBonuses.totalDmgPercent / 100));
+      }
+
       // Set active: bonus_damage (추가 피해)
       const setActives = battleSetActiveMap.get(battleState.id) ?? [];
       for (const sa of setActives) {
@@ -695,7 +701,15 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
       }
     }
 
-    const damage = calculateDamage(getEffectiveAttack(enemy), getEffectiveDefense(player), chosen.damageMultiplier, false);
+    let damage = calculateDamage(getEffectiveAttack(enemy), getEffectiveDefense(player), chosen.damageMultiplier, false);
+
+    // Premium talent: dmgReductionPercent
+    const enemyTurnTalentBonuses = battleTalentMap.get(battleState.id);
+    if (enemyTurnTalentBonuses && enemyTurnTalentBonuses.dmgReductionPercent > 0) {
+      damage = Math.round(damage * (1 - enemyTurnTalentBonuses.dmgReductionPercent / 100));
+      damage = Math.max(1, damage);
+    }
+
     player.currentHp = Math.max(0, player.currentHp - damage);
     player.isAlive = player.currentHp > 0;
 
@@ -1130,6 +1144,13 @@ export function calculateRewards(battleId: string, characterId: string): BattleR
     if (randOptBonus.goldPercent > 0) totalGold = Math.round(totalGold * (1 + randOptBonus.goldPercent / 100));
   }
 
+  // Premium talent: fortunePercent (exp + gold + drop)
+  const rewardTalentBonuses = battleTalentMap.get(battleId);
+  if (rewardTalentBonuses && rewardTalentBonuses.fortunePercent > 0) {
+    totalExp = Math.round(totalExp * (1 + rewardTalentBonuses.fortunePercent / 100));
+    totalGold = Math.round(totalGold * (1 + rewardTalentBonuses.fortunePercent / 100));
+  }
+
   return { exp: totalExp, gold: totalGold, items };
 }
 
@@ -1503,6 +1524,13 @@ export function calculateAbyssRewards(battleId: string, characterId: string): Ba
   if (randOptBonusAbyss) {
     if (randOptBonusAbyss.expPercent > 0) totalExp = Math.round(totalExp * (1 + randOptBonusAbyss.expPercent / 100));
     if (randOptBonusAbyss.goldPercent > 0) totalGold = Math.round(totalGold * (1 + randOptBonusAbyss.goldPercent / 100));
+  }
+
+  // Premium talent: fortunePercent (exp + gold)
+  const abyssTalentBonuses = battleTalentMap.get(battleId);
+  if (abyssTalentBonuses && abyssTalentBonuses.fortunePercent > 0) {
+    totalExp = Math.round(totalExp * (1 + abyssTalentBonuses.fortunePercent / 100));
+    totalGold = Math.round(totalGold * (1 + abyssTalentBonuses.fortunePercent / 100));
   }
 
   return { exp: totalExp, gold: totalGold, items };
