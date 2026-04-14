@@ -531,6 +531,8 @@ function EquippedDetailModal({
   onUnsocket,
   itemOptions,
   onReroll,
+  lockedOptions,
+  onToggleLock,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -544,9 +546,10 @@ function EquippedDetailModal({
   onUnsocket: (itemId: string, socketIndex: number) => void;
   itemOptions: RandomOption[];
   onReroll: (itemId: string, lockedIndices?: number[]) => void;
+  lockedOptions: Set<number>;
+  onToggleLock: (idx: number) => void;
 }) {
-  const [lockedOptions, setLockedOptions] = useState<Set<number>>(new Set());
-
+  const { updateSaveData } = useAuth();
   if (!slot?.data) return null;
 
   const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000 };
@@ -579,11 +582,7 @@ function EquippedDetailModal({
                 options={itemOptions}
                 rarity={slot.data.rarity}
                 lockedIndices={lockedOptions}
-                onToggleLock={(idx) => setLockedOptions((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(idx)) next.delete(idx); else next.add(idx);
-                  return next;
-                })}
+                onToggleLock={onToggleLock}
                 showLock={itemOptions.length > 0}
               />
               <Button
@@ -631,6 +630,35 @@ function EquippedDetailModal({
             </Button>
           </div>
         )}
+
+        {/* Enhancement stone usage */}
+        {canEnhance && (() => {
+          const stoneTypes = [
+            { id: 'enhance_stone_legendary', name: '전설', exp: 100, color: 'text-yellow-400' },
+            { id: 'enhance_stone_epic', name: '영웅', exp: 30, color: 'text-purple-400' },
+            { id: 'enhance_stone_rare', name: '희귀', exp: 10, color: 'text-blue-400' },
+            { id: 'enhance_stone_uncommon', name: '고급', exp: 3, color: 'text-green-400' },
+            { id: 'enhance_stone_common', name: '일반', exp: 1, color: 'text-gray-400' },
+          ];
+          return (
+            <div className="panel p-2 space-y-1">
+              <p className="text-xs text-gray-400">강화석 사용</p>
+              <div className="flex gap-1 flex-wrap">
+                {stoneTypes.map((st) => (
+                  <button key={st.id} type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await axios.post('/api/inventory/use-enhance-stone', { stoneId: st.id, targetItemId: slot.data!.id, quantity: 1 });
+                        if (res.data.success) { updateSaveData(res.data.saveData); toast.success(`${st.name} 강화석 사용! (+${st.exp} exp)`); }
+                      } catch (err: any) { toast.error(err.response?.data?.message || '사용 실패'); }
+                    }}
+                    className={`text-[10px] px-2 py-1 rounded bg-dungeon-bg border border-dungeon-border hover:border-dungeon-accent ${st.color} transition-colors`}
+                  >{st.name} (+{st.exp})</button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="flex gap-2">
           <Button
@@ -694,6 +722,8 @@ function ItemDetailModal({
   itemOptions,
   onReroll,
   onDismantle,
+  lockedOptions,
+  onToggleLock,
 }: {
   item: Item | null;
   enhanceLevel: number;
@@ -713,9 +743,9 @@ function ItemDetailModal({
   itemOptions: RandomOption[];
   onReroll: (itemId: string, lockedIndices?: number[]) => void;
   onDismantle: (itemId: string) => void;
+  lockedOptions: Set<number>;
+  onToggleLock: (idx: number) => void;
 }) {
-  const [lockedOptions, setLockedOptions] = useState<Set<number>>(new Set());
-
   if (!item) return null;
 
   const isEquipType = ['weapon', 'shield', 'offhand', 'helm', 'shoulders', 'chest', 'gloves', 'belt', 'legs', 'boots', 'accessory'].includes(item.type);
@@ -818,11 +848,7 @@ function ItemDetailModal({
                 options={opts}
                 rarity={item.rarity}
                 lockedIndices={lockedOptions}
-                onToggleLock={(idx) => setLockedOptions((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(idx)) next.delete(idx); else next.add(idx);
-                  return next;
-                })}
+                onToggleLock={onToggleLock}
                 showLock={opts.length > 0}
               />
               <Button
@@ -916,6 +942,7 @@ function InventoryScreen() {
   const [selectedItem, setSelectedItem] = useState<ResolvedItem | null>(null);
   const [selectedEquipSlot, setSelectedEquipSlot] = useState<EquippedSlotInfo | null>(null);
   const [equipSelectSlot, setEquipSelectSlot] = useState<string | null>(null);
+  const [lockedOptionsState, setLockedOptionsState] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!isAuthenticated) navigate('/', { replace: true });
@@ -1153,6 +1180,7 @@ function InventoryScreen() {
             // Add random option flat stats to totals
             let randOptAtkPercent = 0, randOptHpPercent = 0;
             let randOptGoldPct = 0, randOptExpPct = 0;
+            let randLifesteal = 0, randReflect = 0, randHpRegen = 0;
             for (const id of equippedIds) {
               const opts = saveData.itemOptions?.[id] ?? [];
               for (const opt of opts) {
@@ -1167,6 +1195,9 @@ function InventoryScreen() {
                   case 'crit_damage': totalCritDmg += opt.value / 100; break;
                   case 'gold_percent': randOptGoldPct += opt.value; break;
                   case 'exp_percent': randOptExpPct += opt.value; break;
+                  case 'lifesteal': randLifesteal += opt.value; break;
+                  case 'reflect': randReflect += opt.value; break;
+                  case 'hp_regen': randHpRegen += opt.value; break;
                 }
               }
             }
@@ -1294,11 +1325,14 @@ function InventoryScreen() {
                     <div className="flex justify-between"><span className="text-gray-500">치명타율</span><span className="text-yellow-400 font-bold">{Math.round(totalCrit * 100)}%</span></div>
                     <div className="flex justify-between col-span-2"><span className="text-gray-500">치명타 피해</span><span className="text-purple-400 font-bold">x{totalCritDmg.toFixed(2)}</span></div>
                   </div>
-                  {(bonusGold > 0 || bonusExp > 0 || bonusDrop > 0) && (
+                  {(bonusGold > 0 || bonusExp > 0 || bonusDrop > 0 || randLifesteal > 0 || randReflect > 0 || randHpRegen > 0) && (
                     <div className="mt-2 pt-2 border-t border-dungeon-border grid grid-cols-3 gap-1 text-[10px]">
                       {bonusExp > 0 && <div className="text-center"><span className="text-gray-500">경험치</span><br/><span className="text-green-400">+{bonusExp}%</span></div>}
                       {bonusGold > 0 && <div className="text-center"><span className="text-gray-500">골드</span><br/><span className="text-yellow-400">+{bonusGold}%</span></div>}
                       {bonusDrop > 0 && <div className="text-center"><span className="text-gray-500">드랍률</span><br/><span className="text-purple-400">+{bonusDrop}%</span></div>}
+                      {randLifesteal > 0 && <div className="text-center"><span className="text-gray-500">흡혈</span><br/><span className="text-red-400">+{randLifesteal.toFixed(1)}%</span></div>}
+                      {randReflect > 0 && <div className="text-center"><span className="text-gray-500">반사</span><br/><span className="text-blue-400">+{randReflect.toFixed(1)}%</span></div>}
+                      {randHpRegen > 0 && <div className="text-center"><span className="text-gray-500">턴HP회복</span><br/><span className="text-pink-400">+{randHpRegen.toFixed(1)}%</span></div>}
                     </div>
                   )}
                 </Card>
@@ -1436,6 +1470,12 @@ function InventoryScreen() {
         itemOptions={selectedItem ? (saveData?.itemOptions?.[selectedItem.data.id] ?? []) : []}
         onReroll={handleReroll}
         onDismantle={handleDismantle}
+        lockedOptions={lockedOptionsState}
+        onToggleLock={(idx) => setLockedOptionsState((prev) => {
+          const next = new Set(prev);
+          if (next.has(idx)) next.delete(idx); else next.add(idx);
+          return next;
+        })}
         onGoldEnhance={async (itemId) => {
           try {
             const res = await axios.post('/api/inventory/enhance-gold', { itemId });
@@ -1470,6 +1510,12 @@ function InventoryScreen() {
         onUnsocket={handleUnsocketGem}
         itemOptions={selectedEquipSlot?.data ? (saveData?.itemOptions?.[selectedEquipSlot.data.id] ?? []) : []}
         onReroll={handleReroll}
+        lockedOptions={lockedOptionsState}
+        onToggleLock={(idx) => setLockedOptionsState((prev) => {
+          const next = new Set(prev);
+          if (next.has(idx)) next.delete(idx); else next.add(idx);
+          return next;
+        })}
         onGoldEnhance={async (itemId) => {
           try {
             const res = await axios.post('/api/inventory/enhance-gold', { itemId });

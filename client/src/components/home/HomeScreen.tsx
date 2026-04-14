@@ -154,6 +154,7 @@ function HomeScreen() {
 
     // Random option bonuses
     let randOptAtkPct = 0, randOptHpPct = 0, randOptGoldPct = 0, randOptExpPct = 0;
+    let randLifesteal = 0, randReflect = 0, randHpRegen = 0;
     for (const id of equippedIds) {
       const opts = saveData.itemOptions?.[id] ?? [];
       for (const opt of opts) {
@@ -167,6 +168,9 @@ function HomeScreen() {
         else if (opt.stat === 'crit_damage') critDmg += opt.value / 100;
         else if (opt.stat === 'gold_percent') randOptGoldPct += opt.value;
         else if (opt.stat === 'exp_percent') randOptExpPct += opt.value;
+        else if (opt.stat === 'lifesteal') randLifesteal += opt.value;
+        else if (opt.stat === 'reflect') randReflect += opt.value;
+        else if (opt.stat === 'hp_regen') randHpRegen += opt.value;
       }
     }
 
@@ -252,7 +256,7 @@ function HomeScreen() {
       if (art.effectType === 'dropRatePercent') bonusDrop += val2;
     }
 
-    return { hp, mp, atk, def, spd, crit, critDmg, bonusExp, bonusGold, bonusDrop };
+    return { hp, mp, atk, def, spd, crit, critDmg, bonusExp, bonusGold, bonusDrop, randLifesteal, randReflect, randHpRegen };
   }, [baseStats, equipStats, saveData]);
 
   const expToNext = useMemo(() => (saveData?.level ?? 1) * 100, [saveData?.level]);
@@ -483,11 +487,14 @@ function HomeScreen() {
         </div>
 
         {/* Bonus percentages */}
-        {(totalStats.bonusExp > 0 || totalStats.bonusGold > 0 || totalStats.bonusDrop > 0) && (
+        {(totalStats.bonusExp > 0 || totalStats.bonusGold > 0 || totalStats.bonusDrop > 0 || totalStats.randLifesteal > 0 || totalStats.randReflect > 0 || totalStats.randHpRegen > 0) && (
           <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-dungeon-border text-center text-[11px]">
             {totalStats.bonusExp > 0 && <div><span className="text-gray-500">경험치</span><br/><span className="text-green-400 font-bold">+{totalStats.bonusExp}%</span></div>}
             {totalStats.bonusGold > 0 && <div><span className="text-gray-500">골드</span><br/><span className="text-yellow-400 font-bold">+{totalStats.bonusGold}%</span></div>}
             {totalStats.bonusDrop > 0 && <div><span className="text-gray-500">드랍률</span><br/><span className="text-purple-400 font-bold">+{totalStats.bonusDrop}%</span></div>}
+            {totalStats.randLifesteal > 0 && <div><span className="text-gray-500">흡혈</span><br/><span className="text-red-400 font-bold">+{totalStats.randLifesteal.toFixed(1)}%</span></div>}
+            {totalStats.randReflect > 0 && <div><span className="text-gray-500">반사</span><br/><span className="text-blue-400 font-bold">+{totalStats.randReflect.toFixed(1)}%</span></div>}
+            {totalStats.randHpRegen > 0 && <div><span className="text-gray-500">턴HP회복</span><br/><span className="text-pink-400 font-bold">+{totalStats.randHpRegen.toFixed(1)}%</span></div>}
           </div>
         )}
 
