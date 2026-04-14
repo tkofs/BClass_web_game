@@ -408,17 +408,20 @@ export function useEnhanceStone(saveData: SaveData, stoneId: string, targetItemI
   if (quantity <= 0) return { success: false, error: 'Quantity must be positive' };
 
   const stoneSlot = saveData.inventory.find(s => s.itemId === stoneId);
-  if (!stoneSlot || stoneSlot.quantity < quantity) return { success: false, error: 'Not enough enhancement stones' };
+  if (!stoneSlot || stoneSlot.quantity <= 0) return { success: false, error: 'Not enough enhancement stones' };
+
+  // Use all available if requested more than owned
+  const actualQty = Math.min(quantity, stoneSlot.quantity);
 
   if (!ownsEquipment(saveData, targetItemId)) return { success: false, error: 'Target item not owned' };
 
-  const removed = removeItem(saveData, stoneId, quantity);
+  const removed = removeItem(saveData, stoneId, actualQty);
   if (!removed.success) return { success: false, error: removed.error };
 
   if (!saveData.enhanceLevels) saveData.enhanceLevels = {};
   const entry = saveData.enhanceLevels[targetItemId] ?? { level: 0, exp: 0 };
   const beforeLevel = entry.level;
-  entry.exp += expPerStone * quantity;
+  entry.exp += expPerStone * actualQty;
 
   while (entry.level < MAX_ENHANCE_LEVEL) {
     const cost = enhanceCost(entry.level + 1);
@@ -433,7 +436,7 @@ export function useEnhanceStone(saveData: SaveData, stoneId: string, targetItemI
     success: true,
     beforeLevel,
     afterLevel: entry.level,
-    expAdded: expPerStone * quantity,
+    expAdded: expPerStone * actualQty,
     currentExp: entry.exp,
     nextCost: entry.level < MAX_ENHANCE_LEVEL ? enhanceCost(entry.level + 1) : undefined,
   };
