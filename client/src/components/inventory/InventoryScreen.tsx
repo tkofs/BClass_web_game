@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useInventory } from '@/hooks/useInventory';
 import type { ResolvedItem, EquippedSlotInfo } from '@/hooks/useInventory';
 import type { Item, ItemRarity } from '@shared/types';
-import { ITEMS, SETS, CHARACTERS, GEMS } from '@shared/data';
+import { ITEMS, SETS, CHARACTERS, GEMS, TITLES, PETS, ARTIFACTS } from '@shared/data';
 import axios from 'axios';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
@@ -959,6 +959,69 @@ function InventoryScreen() {
               }
             }
 
+            // Prestige bonus
+            const prestigeBonus = 1 + (saveData.prestigeLevel ?? 0) * 0.02;
+            totalHp = Math.round(totalHp * prestigeBonus);
+            totalMp = Math.round(totalMp * prestigeBonus);
+            totalAtk = Math.round(totalAtk * prestigeBonus);
+            totalDef = Math.round(totalDef * prestigeBonus);
+
+            // Talent bonuses
+            const tp = saveData.talentPoints ?? {};
+            const talentAtkP = (tp['off_atk'] ?? 0) * 3;
+            const talentDefP = (tp['def_def'] ?? 0) * 3;
+            const talentHpP = (tp['def_hp'] ?? 0) * 5;
+            const talentMpP = (tp['util_mp'] ?? 0) * 5;
+            totalAtk = Math.round(totalAtk * (1 + talentAtkP / 100));
+            totalDef = Math.round(totalDef * (1 + talentDefP / 100));
+            totalHp = Math.round(totalHp * (1 + talentHpP / 100));
+            totalMp = Math.round(totalMp * (1 + talentMpP / 100));
+            totalCrit += (tp['off_crit'] ?? 0) * 0.01;
+            totalCritDmg *= (1 + (tp['off_critdmg'] ?? 0) * 5 / 100);
+
+            // Title bonus
+            const titleId = saveData.equippedTitle ?? '';
+            if (titleId) {
+              const title = TITLES.find((t) => t.id === titleId);
+              if (title?.bonus) {
+                if (title.bonus.stat === 'atkPercent') totalAtk = Math.round(totalAtk * (1 + title.bonus.value / 100));
+                if (title.bonus.stat === 'defPercent') totalDef = Math.round(totalDef * (1 + title.bonus.value / 100));
+                if (title.bonus.stat === 'hpPercent') totalHp = Math.round(totalHp * (1 + title.bonus.value / 100));
+              }
+            }
+
+            // Pet bonus
+            if (saveData.activePet) {
+              const pet = PETS.find((p) => p.id === saveData.activePet);
+              if (pet) {
+                for (const b of pet.bonus) {
+                  if (b.stat === 'atkPercent') totalAtk = Math.round(totalAtk * (1 + b.value / 100));
+                  if (b.stat === 'defPercent') totalDef = Math.round(totalDef * (1 + b.value / 100));
+                  if (b.stat === 'hpPercent') totalHp = Math.round(totalHp * (1 + b.value / 100));
+                  if (b.stat === 'mpPercent') totalMp = Math.round(totalMp * (1 + b.value / 100));
+                  if (b.stat === 'critRateFlat') totalCrit += b.value;
+                }
+              }
+            }
+
+            // Artifact bonus
+            const arts = saveData.artifacts ?? {};
+            let bonusGold = 0, bonusExp = 0, bonusDrop = 0;
+            for (const art of ARTIFACTS) {
+              const lv = arts[art.id] ?? 0;
+              if (lv <= 0) continue;
+              const val = art.effectPerLevel * lv;
+              if (art.effectType === 'hpPercent') totalHp = Math.round(totalHp * (1 + val / 100));
+              if (art.effectType === 'mpPercent') totalMp = Math.round(totalMp * (1 + val / 100));
+              if (art.effectType === 'atkPercent') totalAtk = Math.round(totalAtk * (1 + val / 100));
+              if (art.effectType === 'defPercent') totalDef = Math.round(totalDef * (1 + val / 100));
+              if (art.effectType === 'goldPercent') bonusGold += val;
+              if (art.effectType === 'expPercent') bonusExp += val;
+              if (art.effectType === 'dropRatePercent') bonusDrop += val;
+            }
+            // talent gold bonus
+            bonusGold += (tp['util_gold'] ?? 0) * 5;
+
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Total stats */}
@@ -973,6 +1036,13 @@ function InventoryScreen() {
                     <div className="flex justify-between"><span className="text-gray-500">치명타율</span><span className="text-yellow-400 font-bold">{Math.round(totalCrit * 100)}%</span></div>
                     <div className="flex justify-between col-span-2"><span className="text-gray-500">치명타 피해</span><span className="text-purple-400 font-bold">x{totalCritDmg.toFixed(2)}</span></div>
                   </div>
+                  {(bonusGold > 0 || bonusExp > 0 || bonusDrop > 0) && (
+                    <div className="mt-2 pt-2 border-t border-dungeon-border grid grid-cols-3 gap-1 text-[10px]">
+                      {bonusExp > 0 && <div className="text-center"><span className="text-gray-500">경험치</span><br/><span className="text-green-400">+{bonusExp}%</span></div>}
+                      {bonusGold > 0 && <div className="text-center"><span className="text-gray-500">골드</span><br/><span className="text-yellow-400">+{bonusGold}%</span></div>}
+                      {bonusDrop > 0 && <div className="text-center"><span className="text-gray-500">드랍률</span><br/><span className="text-purple-400">+{bonusDrop}%</span></div>}
+                    </div>
+                  )}
                 </Card>
 
                 {/* Set bonuses */}
