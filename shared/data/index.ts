@@ -13,3 +13,5 @@ export { TALENTS, calculateTalentBonuses } from './talents';
 export type { TalentNode, TalentBonuses } from './talents';
 export { TITLES } from './titles';
 export type { Title } from './titles';
+export { ARTIFACTS } from './artifacts';
+export type { Artifact } from './artifacts';

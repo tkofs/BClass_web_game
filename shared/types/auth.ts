@@ -25,6 +25,7 @@ export interface SaveData {
   lastWeeklyBoss: string;  // ISO date of last weekly boss attempt
   talentPoints: Record<string, number>;  // talentId → invested levels
   equippedTitle: string;  // title ID
+  artifacts: Record<string, number>;  // artifactId → level
   ownedPets: string[];     // owned pet IDs
   activePet: string;       // equipped pet ID
   appearance: { color: string };

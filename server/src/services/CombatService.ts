@@ -13,6 +13,20 @@ import type {
 import { CHARACTERS, SKILLS, MONSTERS, DUNGEONS, ITEMS, SETS, GEMS, PETS, TALENTS, calculateTalentBonuses, TITLES } from '../../../shared/data';
 import type { SetBonus } from '../../../shared/data/sets';
 import type { TalentBonuses } from '../../../shared/data/talents';
+import { ARTIFACTS } from '../../../shared/data';
+
+/** Calculate artifact bonuses from saveData */
+function getArtifactBonuses(artifacts: Record<string, number> | undefined): Record<string, number> {
+  const bonuses: Record<string, number> = {};
+  if (!artifacts) return bonuses;
+  for (const art of ARTIFACTS) {
+    const level = artifacts[art.id] ?? 0;
+    if (level > 0) {
+      bonuses[art.effectType] = (bonuses[art.effectType] ?? 0) + art.effectPerLevel * level;
+    }
+  }
+  return bonuses;
+}
 
 // ────────────────────────────────────────────────────────────
 // Battle state store (keyed by battle id)
@@ -173,6 +187,13 @@ export function initBattle(
       }
     }
   }
+
+  // Artifact bonus
+  const artBonuses = getArtifactBonuses(saveData.artifacts);
+  baseHp = Math.round(baseHp * (1 + (artBonuses.hpPercent ?? 0) / 100));
+  baseMp = Math.round(baseMp * (1 + (artBonuses.mpPercent ?? 0) / 100));
+  baseAtk = Math.round(baseAtk * (1 + (artBonuses.atkPercent ?? 0) / 100));
+  baseDef = Math.round(baseDef * (1 + (artBonuses.defPercent ?? 0) / 100));
 
   const player: BattleFighter = {
     id: 'player',

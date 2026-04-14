@@ -142,6 +142,7 @@ function HomeScreen() {
   const handleSkills = useCallback(() => navigate('/skills'), [navigate]);
   const handleAchievements = useCallback(() => navigate('/achievements'), [navigate]);
   const handlePets = useCallback(() => navigate('/pets'), [navigate]);
+  const handleArtifacts = useCallback(() => navigate('/artifacts'), [navigate]);
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const colorPickerRef = useRef<HTMLDivElement>(null);
@@ -173,16 +174,20 @@ function HomeScreen() {
 
   const handlePrestige = useCallback(async () => {
     const nextPrestige = (saveData?.prestigeLevel ?? 0) + 1;
-    const gemReward = 50 * nextPrestige;
+    const baseGems = 50 * nextPrestige;
+    const levelBonus = Math.max(0, (saveData?.level ?? 60) - 60) * 2;
+    const abyssBonus = Math.floor((saveData?.abyssHighest ?? 0) * 0.5);
+    const totalGems = baseGems + levelBonus + abyssBonus;
     const confirmed = window.confirm(
       `환생하시겠습니까?\n\n` +
-      `- 레벨이 1로 초기화됩니다\n` +
-      `- 스킬 레벨이 초기화됩니다\n` +
-      `- 심연 진행도가 초기화됩니다\n` +
-      `- 장비, 강화, 업적, 골드, 젬은 유지됩니다\n\n` +
+      `초기화:\n` +
+      `- 레벨 (현재 ${saveData?.level})\n` +
+      `- 스킬 레벨, 특성 포인트\n` +
+      `- 심연 진행도 (최고 기록은 유지)\n\n` +
+      `유지: 장비, 강화, 업적, 골드, 젬, 유물\n\n` +
       `보상:\n` +
-      `- 환생 레벨 ${nextPrestige} (전 스탯 +${nextPrestige * 2}%)\n` +
-      `- 젬 ${gemReward}개`
+      `- 환생 Lv.${nextPrestige} (전 스탯 +${nextPrestige * 2}%)\n` +
+      `- 젬 ${totalGems}개 (기본 ${baseGems} + 레벨 ${levelBonus} + 심연 ${abyssBonus})`
     );
     if (!confirmed) return;
     try {
@@ -194,7 +199,7 @@ function HomeScreen() {
     } catch {
       alert('환생에 실패했습니다.');
     }
-  }, [saveData?.prestigeLevel, updateSaveData]);
+  }, [saveData, updateSaveData]);
 
   const handleClaimDaily = useCallback(async () => {
     try {
@@ -390,6 +395,11 @@ function HomeScreen() {
           <div className="text-3xl mb-2 text-dungeon-accent">&#9733;</div>
           <p className="text-lg font-bold">기록일지</p>
           <p className="text-xs text-gray-500 mt-1">몬스터를 확인하세요</p>
+        </Card>
+        <Card hover onClick={handleArtifacts} className="text-center py-6">
+          <div className="text-3xl mb-2 text-purple-400">&#128302;</div>
+          <p className="text-lg font-bold">유물</p>
+          <p className="text-xs text-gray-500 mt-1">영구 강화 (젬)</p>
         </Card>
         <Card hover onClick={() => navigate('/ranking')} className="text-center py-6">
           <div className="text-3xl mb-2 text-amber-400">&#127941;</div>

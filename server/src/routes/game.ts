@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { validate } from '../middleware/validate';
 import * as AuthService from '../services/AuthService';
-import { CHARACTERS, DUNGEONS, SKILLS, TALENTS, TITLES } from '../../../shared/data';
+import { CHARACTERS, DUNGEONS, SKILLS, TALENTS, TITLES, ARTIFACTS } from '../../../shared/data';
 import type { TalentNode } from '../../../shared/data/talents';
 
 const router = Router();
@@ -142,11 +142,19 @@ router.post('/prestige', (req: Request, res: Response): void => {
       return;
     }
 
-    // Increment prestige
-    saveData.prestigeLevel = (saveData.prestigeLevel ?? 0) + 1;
+    // Calculate gem reward BEFORE resetting
+    const currentLevel = saveData.level;
+    const abyssHighest = saveData.abyssHighest ?? 0;
+    const newPrestige = (saveData.prestigeLevel ?? 0) + 1;
 
-    // Grant gems: 50 * prestigeLevel
-    saveData.gems += 50 * saveData.prestigeLevel;
+    const baseGems = 50 * newPrestige;
+    const levelBonus = Math.max(0, currentLevel - 60) * 2;
+    const abyssBonus = Math.floor(abyssHighest * 0.5);
+    const totalGems = baseGems + levelBonus + abyssBonus;
+
+    // Increment prestige
+    saveData.prestigeLevel = newPrestige;
+    saveData.gems += totalGems;
 
     // Reset progression
     saveData.level = 1;
@@ -155,14 +163,15 @@ router.post('/prestige', (req: Request, res: Response): void => {
     saveData.talentPoints = {};
     saveData.abyssFloor = 0;
 
-    // Keep: inventory, equippedItems, enhanceLevels, achievements, bestiary, dropHistory, gold, gems, abyssHighest
+    // Keep: inventory, equippedItems, enhanceLevels, achievements, bestiary, dropHistory, gold, gems, abyssHighest, artifacts
 
     AuthService.saveProgress(saveCode, saveData);
 
     res.json({
       success: true,
-      message: `환생 완료! 환생 레벨: ${saveData.prestigeLevel}`,
+      message: `환생 완료! 환생 Lv.${newPrestige} | 젬 +${totalGems} (기본 ${baseGems} + 레벨 ${levelBonus} + 심연 ${abyssBonus})`,
       saveData,
+      gemBreakdown: { base: baseGems, level: levelBonus, abyss: abyssBonus, total: totalGems },
     });
   } catch (err) {
     console.error('[game/prestige]', err);
@@ -388,6 +397,69 @@ router.post(
       res.json({ success: true, saveData });
     } catch (err) {
       console.error('[game/equip-title]', err);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  },
+);
+
+// ── POST /artifact-upgrade ──────────────────────────────────
+router.post(
+  '/artifact-upgrade',
+  validate([{ name: 'artifactId', type: 'string', minLength: 1 }]),
+  (req: Request, res: Response): void => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.status(401).json({ success: false, message: 'Missing authorization' });
+        return;
+      }
+      const token = authHeader.slice(7);
+      const saveCode = AuthService.verifyToken(token);
+      if (!saveCode) {
+        res.status(401).json({ success: false, message: 'Invalid token' });
+        return;
+      }
+
+      const saveData = AuthService.getSaveData(saveCode);
+      if (!saveData) {
+        res.status(404).json({ success: false, message: 'Save data not found' });
+        return;
+      }
+
+      const { artifactId } = req.body;
+      const artifact = ARTIFACTS.find((a) => a.id === artifactId);
+      if (!artifact) {
+        res.status(400).json({ success: false, message: 'Artifact not found' });
+        return;
+      }
+
+      if (!saveData.artifacts) saveData.artifacts = {};
+      const currentLevel = saveData.artifacts[artifactId] ?? 0;
+
+      if (currentLevel >= artifact.maxLevel) {
+        res.status(400).json({ success: false, message: '이미 최대 레벨입니다' });
+        return;
+      }
+
+      const cost = artifact.costPerLevel(currentLevel + 1);
+      if ((saveData.gems ?? 0) < cost) {
+        res.status(400).json({ success: false, message: `젬이 부족합니다 (필요: ${cost})` });
+        return;
+      }
+
+      saveData.gems -= cost;
+      saveData.artifacts[artifactId] = currentLevel + 1;
+
+      AuthService.saveProgress(saveCode, saveData);
+      res.json({
+        success: true,
+        artifactId,
+        newLevel: currentLevel + 1,
+        gemSpent: cost,
+        saveData,
+      });
+    } catch (err) {
+      console.error('[game/artifact-upgrade]', err);
       res.status(500).json({ success: false, message: 'Internal server error' });
     }
   },

@@ -129,6 +129,7 @@ export function createNewGame(
     lastWeeklyBoss: '',
     talentPoints: {},
     equippedTitle: '',
+    artifacts: {},
     ownedPets: [],
     activePet: '',
     appearance: { color: '#8B5CF6' },
