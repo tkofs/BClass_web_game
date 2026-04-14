@@ -299,82 +299,78 @@ export function getEnhanceInfo(saveData: SaveData, itemId: string): EnhanceInfo 
 }
 
 // ────────────────────────────────────────────────────────────
-// Gold Enhancement
+// Gem Enhancement (replaces gold enhancement)
 // ────────────────────────────────────────────────────────────
 
-const RARITY_BASE_GOLD: Record<string, number> = {
-  common: 100,
-  uncommon: 500,
-  rare: 2000,
-  epic: 10000,
-  legendary: 50000,
-  mythic: 100000,
+const RARITY_BASE_GEM: Record<string, number> = {
+  common: 5,
+  uncommon: 10,
+  rare: 15,
+  epic: 25,
+  legendary: 30,
+  mythic: 50,
 };
 
-/** Gold cost for enhancing to targetLevel */
-export function goldEnhanceCost(rarity: string, targetLevel: number): number {
-  const base = RARITY_BASE_GOLD[rarity] ?? 1000;
-  return base * targetLevel * targetLevel;
+/** Gem cost for enhancing to targetLevel: min(1000, base * level) */
+export function gemEnhanceCost(rarity: string, targetLevel: number): number {
+  const base = RARITY_BASE_GEM[rarity] ?? 10;
+  return Math.min(1000, base * targetLevel);
 }
 
-/** Success rate for gold enhancement: max(5, 50 - (level-5)*1.5) */
-export function goldEnhanceSuccessRate(targetLevel: number): number {
+/** Success rate: max(5, 50 - (level-5)*1.5) */
+export function gemEnhanceSuccessRate(targetLevel: number): number {
   if (targetLevel <= 5) return 50;
   return Math.max(5, 50 - (targetLevel - 5) * 1.5);
 }
 
-export interface GoldEnhanceResult {
+export interface GemEnhanceResult {
   success: boolean;
   enhanced: boolean;
-  goldSpent: number;
+  gemSpent: number;
   successRate: number;
   error?: string;
 }
 
-export function enhanceWithGold(saveData: SaveData, itemId: string): GoldEnhanceResult {
+export function enhanceWithGem(saveData: SaveData, itemId: string): GemEnhanceResult {
   const itemDef = ITEMS.find((i) => i.id === itemId);
-  if (!itemDef) return { success: false, enhanced: false, goldSpent: 0, successRate: 0, error: 'Item not found' };
+  if (!itemDef) return { success: false, enhanced: false, gemSpent: 0, successRate: 0, error: 'Item not found' };
 
   if (!EQUIP_TYPES.has(itemDef.type)) {
-    return { success: false, enhanced: false, goldSpent: 0, successRate: 0, error: 'Equipment only' };
+    return { success: false, enhanced: false, gemSpent: 0, successRate: 0, error: 'Equipment only' };
   }
 
-  // Check ownership
   if (!ownsEquipment(saveData, itemId)) {
-    return { success: false, enhanced: false, goldSpent: 0, successRate: 0, error: 'Item not owned' };
+    return { success: false, enhanced: false, gemSpent: 0, successRate: 0, error: 'Item not owned' };
   }
 
   const entry = saveData.enhanceLevels[itemId] ?? { level: 0, exp: 0 };
   if (entry.level >= MAX_ENHANCE_LEVEL) {
-    return { success: false, enhanced: false, goldSpent: 0, successRate: 0, error: 'Already max level' };
+    return { success: false, enhanced: false, gemSpent: 0, successRate: 0, error: 'Already max level' };
   }
 
   const targetLevel = entry.level + 1;
-  const cost = goldEnhanceCost(itemDef.rarity, targetLevel);
-  const rate = goldEnhanceSuccessRate(targetLevel);
+  const cost = gemEnhanceCost(itemDef.rarity, targetLevel);
+  const rate = gemEnhanceSuccessRate(targetLevel);
 
-  if (saveData.gold < cost) {
-    return { success: false, enhanced: false, goldSpent: 0, successRate: rate, error: `Gold 부족 (필요: ${cost.toLocaleString()}G)` };
+  if ((saveData.gems ?? 0) < cost) {
+    return { success: false, enhanced: false, gemSpent: 0, successRate: rate, error: `젬 부족 (필요: ${cost})` };
   }
 
-  // Deduct gold
-  saveData.gold -= cost;
+  saveData.gems -= cost;
 
-  // Roll success
   const roll = Math.random() * 100;
   if (roll < rate) {
     entry.level = targetLevel;
     saveData.enhanceLevels[itemId] = entry;
-    return { success: true, enhanced: true, goldSpent: cost, successRate: rate };
+    return { success: true, enhanced: true, gemSpent: cost, successRate: rate };
   }
 
-  // Failed — gold lost, level stays
   saveData.enhanceLevels[itemId] = entry;
-  return { success: true, enhanced: false, goldSpent: cost, successRate: rate };
+  return { success: true, enhanced: false, gemSpent: cost, successRate: rate };
 }
 
-/** Get gold enhance info for UI */
-export function getGoldEnhanceInfo(saveData: SaveData, itemId: string): { cost: number; rate: number; currentLevel: number } | null {
+/** Get gem enhance info for UI */
+export function getGemEnhanceInfo(saveData: SaveData, itemId: string): { cost: number; rate: number; currentLevel: number } | null {
   const itemDef = ITEMS.find((i) => i.id === itemId);
   if (!itemDef || !EQUIP_TYPES.has(itemDef.type)) return null;
 
@@ -383,8 +379,8 @@ export function getGoldEnhanceInfo(saveData: SaveData, itemId: string): { cost: 
 
   const targetLevel = entry.level + 1;
   return {
-    cost: goldEnhanceCost(itemDef.rarity, targetLevel),
-    rate: goldEnhanceSuccessRate(targetLevel),
+    cost: gemEnhanceCost(itemDef.rarity, targetLevel),
+    rate: gemEnhanceSuccessRate(targetLevel),
     currentLevel: entry.level,
   };
 }

@@ -559,9 +559,9 @@ function EquippedDetailModal({
   const { updateSaveData } = useAuth();
   if (!slot?.data) return null;
 
-  const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000, mythic: 200000 };
+  const RARITY_BASE_GEM: Record<string, number> = { common: 5, uncommon: 10, rare: 15, epic: 25, legendary: 30, mythic: 50 };
   const target = slot.enhanceLevel + 1;
-  const enhanceCostGold = (RARITY_BASE[slot.data.rarity] ?? 1000) * target * target;
+  const enhanceCostGold = Math.min(1000, (RARITY_BASE_GEM[slot.data.rarity] ?? 10) * target);
   const enhanceRate = target <= 5 ? 50 : Math.max(5, 50 - (target - 5) * 1.5);
   const canEnhance = slot.enhanceLevel < 99;
 
@@ -599,7 +599,7 @@ function EquippedDetailModal({
                 onClick={() => onReroll(slot.data!.id, Array.from(lockedOptions))}
                 className="w-full mt-1"
               >
-                옵션 리롤 ({cost.toLocaleString()}G{lockCount > 0 ? ` / 잠금 ${lockCount}개` : ''})
+                옵션 리롤 ({cost.toLocaleString()} 젬{lockCount > 0 ? ` / 잠금 ${lockCount}개` : ''})
               </Button>
             </>
           );
@@ -618,9 +618,9 @@ function EquippedDetailModal({
         {/* Gold enhance */}
         {canEnhance && (
           <div className="panel p-2 text-center space-y-1">
-            <p className="text-xs text-gray-400">골드 강화 (+{slot.enhanceLevel} &rarr; +{target})</p>
+            <p className="text-xs text-gray-400">젬 강화 (+{slot.enhanceLevel} &rarr; +{target})</p>
             <p className="text-sm">
-              <span className="text-yellow-400 font-bold">{enhanceCostGold.toLocaleString()}G</span>
+              <span className="text-yellow-400 font-bold">{enhanceCostGold.toLocaleString()} 젬</span>
               <span className="text-gray-500 mx-2">|</span>
               <span className={`font-bold ${enhanceRate >= 50 ? 'text-green-400' : enhanceRate >= 20 ? 'text-yellow-400' : 'text-red-400'}`}>
                 성공률 {enhanceRate.toFixed(1)}%
@@ -633,7 +633,7 @@ function EquippedDetailModal({
               onClick={() => onGoldEnhance(slot.data!.id)}
               className="w-full"
             >
-              {gold < enhanceCostGold ? 'Gold 부족' : '골드 강화'}
+              {gold < enhanceCostGold ? '젬 부족' : '젬 강화'}
             </Button>
           </div>
         )}
@@ -855,7 +855,7 @@ function ItemDetailModal({
                 onClick={() => onReroll(item.id, Array.from(lockedOptions))}
                 className="w-full mt-1"
               >
-                옵션 리롤 ({rerollCost.toLocaleString()}G{lockCount > 0 ? ` / 잠금 ${lockCount}개` : ''})
+                옵션 리롤 ({rerollCost.toLocaleString()} 젬{lockCount > 0 ? ` / 잠금 ${lockCount}개` : ''})
               </Button>
             </>
           );
@@ -864,9 +864,9 @@ function ItemDetailModal({
         {/* Gold enhance */}
         {isEquipType && goldEnhanceInfo && (
           <div className="panel p-2 text-center space-y-1">
-            <p className="text-xs text-gray-400">골드 강화 (+{enhanceLevel} → +{enhanceLevel + 1})</p>
+            <p className="text-xs text-gray-400">젬 강화 (+{enhanceLevel} → +{enhanceLevel + 1})</p>
             <p className="text-sm">
-              <span className="text-yellow-400 font-bold">{goldEnhanceInfo.cost.toLocaleString()}G</span>
+              <span className="text-yellow-400 font-bold">{goldEnhanceInfo.cost.toLocaleString()} 젬</span>
               <span className="text-gray-500 mx-2">|</span>
               <span className={`font-bold ${goldEnhanceInfo.rate >= 50 ? 'text-green-400' : goldEnhanceInfo.rate >= 20 ? 'text-yellow-400' : 'text-red-400'}`}>
                 성공률 {goldEnhanceInfo.rate.toFixed(1)}%
@@ -879,7 +879,7 @@ function ItemDetailModal({
               onClick={() => onGoldEnhance(item.id)}
               className="w-full"
             >
-              {gold < goldEnhanceInfo.cost ? 'Gold 부족' : '골드 강화'}
+              {gold < goldEnhanceInfo.cost ? '젬 부족' : '젬 강화'}
             </Button>
           </div>
         )}
@@ -1098,7 +1098,7 @@ function InventoryScreen() {
       const res = await axios.post('/api/inventory/reroll', { itemId, lockedIndices });
       if (res.data.success) {
         updateSaveData(res.data.saveData);
-        toast.success(`리롤 완료! (${res.data.goldSpent.toLocaleString()}G 소모)`);
+        toast.success(`리롤 완료! (${res.data.goldSpent.toLocaleString()} 젬 소모)`);
         // 잠금 유지 (서버에서 잠긴 옵션 위치 보존됨)
         setSelectedItem((prev) => prev ? { ...prev } : null);
         setSelectedEquipSlot((prev) => prev ? { ...prev } : null);
@@ -1484,15 +1484,15 @@ function InventoryScreen() {
         onUse={useItem}
         onEquip={handleEquip}
         onSell={(itemId) => { sellItem(itemId, 1); }}
-        gold={totalGold}
+        gold={totalGems}
         goldEnhanceInfo={(() => {
           if (!selectedItem) return null;
           const rarity = selectedItem.data.rarity;
           const level = getEnhanceLevel(selectedItem.data.id);
           if (level >= 99) return null;
-          const RARITY_BASE: Record<string, number> = { common: 100, uncommon: 500, rare: 2000, epic: 10000, legendary: 50000, mythic: 200000 };
+          const RARITY_BASE_GEM: Record<string, number> = { common: 5, uncommon: 10, rare: 15, epic: 25, legendary: 30, mythic: 50 };
           const target = level + 1;
-          const cost = (RARITY_BASE[rarity] ?? 1000) * target * target;
+          const cost = Math.min(1000, (RARITY_BASE_GEM[rarity] ?? 10) * target);
           const rate = target <= 5 ? 50 : Math.max(5, 50 - (target - 5) * 1.5);
           return { cost, rate };
         })()}
@@ -1520,9 +1520,9 @@ function InventoryScreen() {
             if (res.data.success) {
               updateSaveData(res.data.saveData);
               if (res.data.enhanced) {
-                toast.success(`강화 성공! (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.success(`강화 성공! (${res.data.goldSpent.toLocaleString()} 젬 소모)`);
               } else {
-                toast.error(`강화 실패... (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.error(`강화 실패... (${res.data.goldSpent.toLocaleString()} 젬 소모)`);
               }
               // Re-select to refresh info
               const updated = res.data.saveData;
@@ -1541,7 +1541,7 @@ function InventoryScreen() {
         onClose={handleCloseEquipped}
         slot={selectedEquipSlot}
         onUnequip={handleUnequip}
-        gold={totalGold}
+        gold={totalGems}
         socketedGems={selectedEquipSlot?.data ? (saveData?.socketedGems?.[selectedEquipSlot.data.id] ?? []) : []}
         playerGems={totalGems}
         onSocket={handleSocketGem}
@@ -1565,9 +1565,9 @@ function InventoryScreen() {
             if (res.data.success) {
               updateSaveData(res.data.saveData);
               if (res.data.enhanced) {
-                toast.success(`강화 성공! (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.success(`강화 성공! (${res.data.goldSpent.toLocaleString()} 젬 소모)`);
               } else {
-                toast.error(`강화 실패... (${res.data.goldSpent.toLocaleString()}G 소모)`);
+                toast.error(`강화 실패... (${res.data.goldSpent.toLocaleString()} 젬 소모)`);
               }
               // Re-select to refresh info
               if (res.data.saveData) {
