@@ -42,6 +42,7 @@ const battleSkillLevelMap = new Map<string, Record<string, number>>();
 const battleTalentMap = new Map<string, TalentBonuses>();
 const battleTitleMap = new Map<string, string>(); // battleId → equipped title ID
 const battleRandomOptionMap = new Map<string, { goldPercent: number; expPercent: number; lifesteal: number; reflect: number; hpRegen: number }>();
+const battlePetMap = new Map<string, { name: string; attack: number; level: number }>();
 
 /** Calculate random option stat bonuses from equipped items */
 function calculateRandomOptionBonuses(saveData: SaveData): {
@@ -219,17 +220,19 @@ export function initBattle(
     }
   }
 
-  // Pet bonus
+  // Pet bonus (with enhancement level scaling)
   let petCritRateBonus = 0;
   if (saveData.activePet) {
     const pet = PETS.find((p) => p.id === saveData.activePet);
     if (pet) {
+      const petLevel = saveData.petLevels?.[saveData.activePet] ?? 0;
+      const petMult = 1 + petLevel * 0.1;
       for (const b of pet.bonus) {
-        if (b.stat === 'atkPercent') baseAtk = Math.round(baseAtk * (1 + b.value / 100));
-        if (b.stat === 'defPercent') baseDef = Math.round(baseDef * (1 + b.value / 100));
-        if (b.stat === 'hpPercent') baseHp = Math.round(baseHp * (1 + b.value / 100));
-        if (b.stat === 'mpPercent') baseMp = Math.round(baseMp * (1 + b.value / 100));
-        if (b.stat === 'critRateFlat') petCritRateBonus += b.value;
+        if (b.stat === 'atkPercent') baseAtk = Math.round(baseAtk * (1 + b.value * petMult / 100));
+        if (b.stat === 'defPercent') baseDef = Math.round(baseDef * (1 + b.value * petMult / 100));
+        if (b.stat === 'hpPercent') baseHp = Math.round(baseHp * (1 + b.value * petMult / 100));
+        if (b.stat === 'mpPercent') baseMp = Math.round(baseMp * (1 + b.value * petMult / 100));
+        if (b.stat === 'critRateFlat') petCritRateBonus += b.value * petMult;
       }
     }
   }
@@ -363,6 +366,18 @@ export function initBattle(
     dungeonId,
     saveData: { ...saveData },
   });
+
+  // Pet combat info
+  if (saveData.activePet) {
+    const pet = PETS.find((p) => p.id === saveData.activePet);
+    if (pet) {
+      battlePetMap.set(battleState.id, {
+        name: pet.name,
+        attack: pet.attack,
+        level: saveData.petLevels?.[saveData.activePet] ?? 0,
+      });
+    }
+  }
 
   return { battleState, skillStates, waveIndex, totalWaves: dungeon.waves.length };
 }
@@ -638,6 +653,35 @@ export function executePlayerAction(
         message: `${target.name} 처치!`,
         type: 'defeat',
       });
+    }
+  }
+
+  // Pet auto-attack
+  const petInfo = battlePetMap.get(battleState.id);
+  if (petInfo) {
+    const aliveEnemy = battleState.enemies.find(e => e.isAlive);
+    if (aliveEnemy) {
+      const petDmg = Math.max(1, Math.round(petInfo.attack * (1 + petInfo.level * 0.1)));
+      aliveEnemy.currentHp = Math.max(0, aliveEnemy.currentHp - petDmg);
+      aliveEnemy.isAlive = aliveEnemy.currentHp > 0;
+
+      battleState.log.push({
+        turn: battleState.turn,
+        message: `[펫] ${petInfo.name}의 공격 → ${aliveEnemy.name}에게 ${petDmg} 데미지`,
+        type: 'damage',
+      });
+
+      if (!aliveEnemy.isAlive) {
+        battleState.log.push({
+          turn: battleState.turn,
+          message: `${aliveEnemy.name} 처치!`,
+          type: 'defeat',
+        });
+      }
+
+      if (battleState.stats) {
+        battleState.stats.totalDamageDealt += petDmg;
+      }
     }
   }
 
@@ -1170,6 +1214,7 @@ export function removeBattle(id: string): void {
   battleTalentMap.delete(id);
   battleTitleMap.delete(id);
   battleRandomOptionMap.delete(id);
+  battlePetMap.delete(id);
   battleWaveMap.delete(id);
   abyssFloorMap.delete(id);
   weeklyBossMap.delete(id);
@@ -1294,17 +1339,19 @@ export function initAbyssBattle(
     }
   }
 
-  // Pet bonus (abyss)
+  // Pet bonus (abyss, with enhancement level scaling)
   let petCritRateBonusAbyss = 0;
   if (saveData.activePet) {
     const pet = PETS.find((p) => p.id === saveData.activePet);
     if (pet) {
+      const petLevel = saveData.petLevels?.[saveData.activePet] ?? 0;
+      const petMult = 1 + petLevel * 0.1;
       for (const b of pet.bonus) {
-        if (b.stat === 'atkPercent') baseAtk = Math.round(baseAtk * (1 + b.value / 100));
-        if (b.stat === 'defPercent') baseDef = Math.round(baseDef * (1 + b.value / 100));
-        if (b.stat === 'hpPercent') baseHp = Math.round(baseHp * (1 + b.value / 100));
-        if (b.stat === 'mpPercent') baseMp = Math.round(baseMp * (1 + b.value / 100));
-        if (b.stat === 'critRateFlat') petCritRateBonusAbyss += b.value;
+        if (b.stat === 'atkPercent') baseAtk = Math.round(baseAtk * (1 + b.value * petMult / 100));
+        if (b.stat === 'defPercent') baseDef = Math.round(baseDef * (1 + b.value * petMult / 100));
+        if (b.stat === 'hpPercent') baseHp = Math.round(baseHp * (1 + b.value * petMult / 100));
+        if (b.stat === 'mpPercent') baseMp = Math.round(baseMp * (1 + b.value * petMult / 100));
+        if (b.stat === 'critRateFlat') petCritRateBonusAbyss += b.value * petMult;
       }
     }
   }
@@ -1420,6 +1467,18 @@ export function initAbyssBattle(
     hpRegen: randOptsAbyss.hpRegen,
   });
   abyssFloorMap.set(battleState.id, floor);
+
+  // Pet combat info (abyss)
+  if (saveData.activePet) {
+    const pet = PETS.find((p) => p.id === saveData.activePet);
+    if (pet) {
+      battlePetMap.set(battleState.id, {
+        name: pet.name,
+        attack: pet.attack,
+        level: saveData.petLevels?.[saveData.activePet] ?? 0,
+      });
+    }
+  }
 
   return { battleState, skillStates, floor };
 }
@@ -1682,17 +1741,19 @@ export function initWeeklyBossBattle(
     }
   }
 
-  // Pet bonus (weekly boss)
+  // Pet bonus (weekly boss, with enhancement level scaling)
   let petCritRateBonusWb = 0;
   if (saveData.activePet) {
     const pet = PETS.find((p) => p.id === saveData.activePet);
     if (pet) {
+      const petLevel = saveData.petLevels?.[saveData.activePet] ?? 0;
+      const petMult = 1 + petLevel * 0.1;
       for (const b of pet.bonus) {
-        if (b.stat === 'atkPercent') baseAtk = Math.round(baseAtk * (1 + b.value / 100));
-        if (b.stat === 'defPercent') baseDef = Math.round(baseDef * (1 + b.value / 100));
-        if (b.stat === 'hpPercent') baseHp = Math.round(baseHp * (1 + b.value / 100));
-        if (b.stat === 'mpPercent') baseMp = Math.round(baseMp * (1 + b.value / 100));
-        if (b.stat === 'critRateFlat') petCritRateBonusWb += b.value;
+        if (b.stat === 'atkPercent') baseAtk = Math.round(baseAtk * (1 + b.value * petMult / 100));
+        if (b.stat === 'defPercent') baseDef = Math.round(baseDef * (1 + b.value * petMult / 100));
+        if (b.stat === 'hpPercent') baseHp = Math.round(baseHp * (1 + b.value * petMult / 100));
+        if (b.stat === 'mpPercent') baseMp = Math.round(baseMp * (1 + b.value * petMult / 100));
+        if (b.stat === 'critRateFlat') petCritRateBonusWb += b.value * petMult;
       }
     }
   }
@@ -1780,6 +1841,18 @@ export function initWeeklyBossBattle(
     reflect: randOptsWb.reflect,
     hpRegen: randOptsWb.hpRegen,
   });
+
+  // Pet combat info (weekly boss)
+  if (saveData.activePet) {
+    const pet = PETS.find((p) => p.id === saveData.activePet);
+    if (pet) {
+      battlePetMap.set(battleState.id, {
+        name: pet.name,
+        attack: pet.attack,
+        level: saveData.petLevels?.[saveData.activePet] ?? 0,
+      });
+    }
+  }
 
   return { battleState, skillStates };
 }

@@ -31,6 +31,9 @@ export interface SaveData {
   artifacts: Record<string, number>;  // artifactId → level
   ownedPets: string[];     // owned pet IDs
   activePet: string;       // equipped pet ID
+  petLevels: Record<string, number>;        // petId → enhancement level
+  petEnhanceExp: Record<string, number>;    // petId → current exp toward next level
+  petGachaPity: number;    // pulls since last mythic pet drop
   itemOptions: Record<string, RandomOption[]>;  // itemId -> random options
   gachaPity: number;  // pulls since last mythic drop
   blessings: { type: string; expiresAt: string }[];
