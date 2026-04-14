@@ -813,23 +813,6 @@ function ItemDetailModal({
           </p>
         )}
 
-        {/* Random options */}
-        {isEquipType && <RandomOptionsDisplay options={itemOptions} />}
-        {isEquipType && itemOptions.length > 0 && (
-          <div className="panel p-2 text-center space-y-1">
-            <p className="text-xs text-gray-400">옵션 리롤</p>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={gold < (REROLL_COSTS[item.rarity] ?? 10000)}
-              onClick={() => onReroll(item.id)}
-              className="w-full"
-            >
-              {gold < (REROLL_COSTS[item.rarity] ?? 10000) ? 'Gold 부족' : `리롤 (${(REROLL_COSTS[item.rarity] ?? 10000).toLocaleString()}G)`}
-            </Button>
-          </div>
-        )}
-
         {/* Gem sockets */}
         {isEquipType && (
           <GemSocketSection
@@ -982,7 +965,7 @@ function InventoryScreen() {
   const [selectedItem, setSelectedItem] = useState<ResolvedItem | null>(null);
   const [selectedEquipSlot, setSelectedEquipSlot] = useState<EquippedSlotInfo | null>(null);
   const [equipSelectSlot, setEquipSelectSlot] = useState<string | null>(null);
-  const [lockedOptionsState, setLockedOptionsState] = useState<Set<number>>(new Set());
+  const [lockedOptionsMap, setLockedOptionsMap] = useState<Record<string, Set<number>>>({});
 
   useEffect(() => {
     if (!isAuthenticated) navigate('/', { replace: true });
@@ -1510,12 +1493,17 @@ function InventoryScreen() {
         itemOptions={selectedItem ? (saveData?.itemOptions?.[selectedItem.data.id] ?? []) : []}
         onReroll={handleReroll}
         onDismantle={handleDismantle}
-        lockedOptions={lockedOptionsState}
-        onToggleLock={(idx) => setLockedOptionsState((prev) => {
-          const next = new Set(prev);
-          if (next.has(idx)) next.delete(idx); else next.add(idx);
-          return next;
-        })}
+        lockedOptions={selectedItem ? (lockedOptionsMap[selectedItem.data.id] ?? new Set()) : new Set()}
+        onToggleLock={(idx) => {
+          if (!selectedItem) return;
+          const id = selectedItem.data.id;
+          setLockedOptionsMap((prev) => {
+            const cur = prev[id] ?? new Set();
+            const next = new Set(cur);
+            if (next.has(idx)) next.delete(idx); else next.add(idx);
+            return { ...prev, [id]: next };
+          });
+        }}
         onGoldEnhance={async (itemId) => {
           try {
             const res = await axios.post('/api/inventory/enhance-gold', { itemId });
@@ -1550,12 +1538,17 @@ function InventoryScreen() {
         onUnsocket={handleUnsocketGem}
         itemOptions={selectedEquipSlot?.data ? (saveData?.itemOptions?.[selectedEquipSlot.data.id] ?? []) : []}
         onReroll={handleReroll}
-        lockedOptions={lockedOptionsState}
-        onToggleLock={(idx) => setLockedOptionsState((prev) => {
-          const next = new Set(prev);
-          if (next.has(idx)) next.delete(idx); else next.add(idx);
-          return next;
-        })}
+        lockedOptions={selectedEquipSlot?.data ? (lockedOptionsMap[selectedEquipSlot.data.id] ?? new Set()) : new Set()}
+        onToggleLock={(idx) => {
+          if (!selectedEquipSlot?.data) return;
+          const id = selectedEquipSlot.data.id;
+          setLockedOptionsMap((prev) => {
+            const cur = prev[id] ?? new Set();
+            const next = new Set(cur);
+            if (next.has(idx)) next.delete(idx); else next.add(idx);
+            return { ...prev, [id]: next };
+          });
+        }}
         onGoldEnhance={async (itemId) => {
           try {
             const res = await axios.post('/api/inventory/enhance-gold', { itemId });
