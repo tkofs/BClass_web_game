@@ -514,12 +514,41 @@ function HomeScreen() {
         <p className="text-sm text-dungeon-accent">{character.title} - {character.name}</p>
         <p className="text-xs text-yellow-400 mt-1">
           Lv. {saveData.level}
-          {(saveData.prestigeLevel ?? 0) > 0 && (
-            <span className="ml-1 text-purple-400">
-              {'★'.repeat(saveData.prestigeLevel ?? 0)}{' '}
-              <span className="text-[10px]">(환생 {saveData.prestigeLevel})</span>
-            </span>
-          )}
+          {(saveData.prestigeLevel ?? 0) > 0 && (() => {
+            const p = saveData.prestigeLevel ?? 0;
+            let stars = '';
+            let color = 'text-gray-400';
+            if (p >= 100) {
+              const crowns = Math.floor(p / 100);
+              const remainder = Math.floor((p % 100) / 50);
+              const gold = Math.floor((p % 50) / 20);
+              const purple = Math.floor((p % 20) / 10);
+              const blue = Math.floor((p % 10) / 5);
+              const gray = p % 5;
+              stars = '👑'.repeat(crowns) + (remainder > 0 ? '🌟'.repeat(remainder) : '') + (gold > 0 ? '💫'.repeat(gold) : '') + (purple > 0 ? '⭐'.repeat(purple) : '') + (blue > 0 ? '★'.repeat(blue) : '') + (gray > 0 ? '✦'.repeat(gray) : '');
+              color = 'text-red-400';
+            } else if (p >= 50) {
+              stars = '🌟'.repeat(Math.floor((p - 50) / 10) + 1);
+              color = 'text-yellow-400';
+            } else if (p >= 20) {
+              stars = '💫'.repeat(Math.floor((p - 20) / 10) + 1);
+              color = 'text-purple-400';
+            } else if (p >= 10) {
+              stars = '⭐'.repeat(p - 9);
+              color = 'text-blue-400';
+            } else if (p >= 5) {
+              stars = '★'.repeat(p - 4);
+              color = 'text-green-400';
+            } else {
+              stars = '✦'.repeat(p);
+              color = 'text-gray-400';
+            }
+            return (
+              <span className={`ml-1 ${color}`}>
+                {stars} <span className="text-[10px]">(환생 {p})</span>
+              </span>
+            );
+          })()}
         </p>
         <div className="w-48 mt-2">
           <StatBar current={saveData.exp} max={expToNext} color="xp" label="EXP" showNumbers />
