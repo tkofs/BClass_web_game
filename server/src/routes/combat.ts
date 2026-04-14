@@ -227,6 +227,19 @@ router.post(
           if (!isLast) {
             CombatService.advanceWave(battleId);
           } else {
+            // First clear bonus
+            const sd = AuthService.getSaveData(saveCode);
+            if (sd && !sd.clearedDungeons?.includes(battleDungeonId)) {
+              if (!sd.clearedDungeons) sd.clearedDungeons = [];
+              sd.clearedDungeons.push(battleDungeonId);
+              const dungeonDef = DUNGEONS.find(d => d.id === battleDungeonId);
+              const gemReward = dungeonDef ? Math.floor(dungeonDef.requiredLevel * 2) : 10;
+              sd.gems += gemReward;
+              if (battleState) {
+                battleState.log.push({ turn: battleState.turn, message: `[첫 클리어 보너스] 젬 +${gemReward}!`, type: 'system' });
+              }
+              AuthService.saveProgress(saveCode, sd);
+            }
             battleState.status = 'victory';
             CombatService.removeBattle(battleId);
           }
@@ -391,6 +404,12 @@ router.post(
             saveData.abyssHighest = saveData.abyssFloor;
           }
 
+          // Abyss milestone bonus (every 50 floors)
+          if (saveData.abyssFloor > 0 && saveData.abyssFloor % 50 === 0) {
+            saveData.gems += 20;
+            battleState.log.push({ turn: battleState.turn, message: `[심연 ${saveData.abyssFloor}층 돌파 보너스] 젬 +20!`, type: 'system' });
+          }
+
           // Apply rewards
           if (rewards) {
             const levelUp = GameService.gainExp(saveData, rewards.exp);
@@ -457,6 +476,12 @@ router.post(
         saveData.abyssFloor = floor + 1;
         if (saveData.abyssFloor > saveData.abyssHighest) {
           saveData.abyssHighest = saveData.abyssFloor;
+        }
+
+        // Abyss milestone bonus (every 50 floors)
+        if (saveData.abyssFloor > 0 && saveData.abyssFloor % 50 === 0) {
+          saveData.gems += 20;
+          battleState.log.push({ turn: battleState.turn, message: `[심연 ${saveData.abyssFloor}층 돌파 보너스] 젬 +20!`, type: 'system' });
         }
 
         if (rewards) {

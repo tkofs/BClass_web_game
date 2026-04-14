@@ -390,6 +390,53 @@ export function getGoldEnhanceInfo(saveData: SaveData, itemId: string): { cost: 
 }
 
 // ────────────────────────────────────────────────────────────
+// Enhancement Stone Usage
+// ────────────────────────────────────────────────────────────
+
+const ENHANCE_STONE_EXP: Record<string, number> = {
+  'enhance_stone_common': 1,
+  'enhance_stone_uncommon': 3,
+  'enhance_stone_rare': 10,
+  'enhance_stone_epic': 30,
+  'enhance_stone_legendary': 100,
+};
+
+export function useEnhanceStone(saveData: SaveData, stoneId: string, targetItemId: string, quantity: number): { success: boolean; error?: string } {
+  const expPerStone = ENHANCE_STONE_EXP[stoneId];
+  if (!expPerStone) return { success: false, error: 'Invalid enhancement stone' };
+
+  if (quantity <= 0) return { success: false, error: 'Quantity must be positive' };
+
+  // Check stone in inventory
+  const stoneSlot = saveData.inventory.find(s => s.itemId === stoneId);
+  if (!stoneSlot || stoneSlot.quantity < quantity) return { success: false, error: 'Not enough enhancement stones' };
+
+  // Check target item ownership
+  if (!ownsEquipment(saveData, targetItemId)) return { success: false, error: 'Target item not owned' };
+
+  // Remove stones
+  const removed = removeItem(saveData, stoneId, quantity);
+  if (!removed.success) return { success: false, error: removed.error };
+
+  // Add exp
+  if (!saveData.enhanceLevels) saveData.enhanceLevels = {};
+  const entry = saveData.enhanceLevels[targetItemId] ?? { level: 0, exp: 0 };
+  entry.exp += expPerStone * quantity;
+
+  // Process level-ups
+  while (entry.level < MAX_ENHANCE_LEVEL) {
+    const cost = enhanceCost(entry.level + 1);
+    if (entry.exp < cost) break;
+    entry.exp -= cost;
+    entry.level += 1;
+  }
+  if (entry.level >= MAX_ENHANCE_LEVEL) { entry.level = MAX_ENHANCE_LEVEL; entry.exp = 0; }
+
+  saveData.enhanceLevels[targetItemId] = entry;
+  return { success: true };
+}
+
+// ────────────────────────────────────────────────────────────
 // Bestiary
 // ────────────────────────────────────────────────────────────
 

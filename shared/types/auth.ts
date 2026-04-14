@@ -11,6 +11,7 @@ export interface SaveData {
   enhanceLevels: Record<string, { level: number; exp: number }>;
   bestiary: BestiaryEntry[];
   dungeonProgress: Record<string, DungeonRecord>;
+  clearedDungeons: string[];
   abyssFloor: number;
   abyssHighest: number;
   shopStock: ShopItem[];

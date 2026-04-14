@@ -115,6 +115,7 @@ export function createNewGame(
     enhanceLevels: {},
     bestiary: [],
     dungeonProgress: {},
+    clearedDungeons: [],
     abyssFloor: 0,
     abyssHighest: 0,
     shopStock: [],

@@ -348,4 +348,40 @@ router.post(
   },
 );
 
+// ── POST /use-enhance-stone ─────────────────────────────────
+router.post(
+  '/use-enhance-stone',
+  validate([
+    { name: 'stoneId', type: 'string', minLength: 1 },
+    { name: 'targetItemId', type: 'string', minLength: 1 },
+    { name: 'quantity', type: 'number', min: 1 },
+  ]),
+  (req: Request, res: Response): void => {
+    try {
+      const saveCode = extractSaveCode(req, res);
+      if (!saveCode) return;
+
+      const saveData = AuthService.getSaveData(saveCode);
+      if (!saveData) {
+        res.status(404).json({ success: false, message: 'Save data not found' });
+        return;
+      }
+
+      const { stoneId, targetItemId, quantity } = req.body;
+      const result = GameService.useEnhanceStone(saveData, stoneId, targetItemId, quantity);
+
+      if (!result.success) {
+        res.status(400).json({ success: false, message: result.error });
+        return;
+      }
+
+      AuthService.saveProgress(saveCode, saveData);
+      res.json({ success: true, saveData });
+    } catch (err) {
+      console.error('[inventory/use-enhance-stone]', err);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  },
+);
+
 export default router;

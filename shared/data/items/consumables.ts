@@ -37,4 +37,31 @@ export const CONSUMABLES: Item[] = [
     stackable: true, maxStack: 99, sellPrice: 80,
     useEffect: { type: 'buff_defense', value: 20, duration: 3 },
   },
+
+  // Enhancement stones
+  {
+    id: 'enhance_stone_common', name: '일반 강화석', description: '장비 강화 경험치 1을 제공한다.',
+    type: 'material', rarity: 'common', iconUrl: '/assets/items/enhance_stone_common.svg',
+    stackable: true, maxStack: 999, sellPrice: 50,
+  },
+  {
+    id: 'enhance_stone_uncommon', name: '고급 강화석', description: '장비 강화 경험치 3을 제공한다.',
+    type: 'material', rarity: 'uncommon', iconUrl: '/assets/items/enhance_stone_uncommon.svg',
+    stackable: true, maxStack: 999, sellPrice: 200,
+  },
+  {
+    id: 'enhance_stone_rare', name: '희귀 강화석', description: '장비 강화 경험치 10을 제공한다.',
+    type: 'material', rarity: 'rare', iconUrl: '/assets/items/enhance_stone_rare.svg',
+    stackable: true, maxStack: 999, sellPrice: 1000,
+  },
+  {
+    id: 'enhance_stone_epic', name: '영웅 강화석', description: '장비 강화 경험치 30을 제공한다.',
+    type: 'material', rarity: 'epic', iconUrl: '/assets/items/enhance_stone_epic.svg',
+    stackable: true, maxStack: 999, sellPrice: 5000,
+  },
+  {
+    id: 'enhance_stone_legendary', name: '전설 강화석', description: '장비 강화 경험치 100을 제공한다.',
+    type: 'material', rarity: 'legendary', iconUrl: '/assets/items/enhance_stone_legendary.svg',
+    stackable: true, maxStack: 999, sellPrice: 20000,
+  },
 ];
