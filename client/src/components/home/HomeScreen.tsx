@@ -49,6 +49,7 @@ function HomeScreen() {
   const [copied, setCopied] = useState(false);
   const [dailyStatus, setDailyStatus] = useState<{ canClaim: boolean; reward: { gold: number; description: string } } | null>(null);
   const [dailyClaimed, setDailyClaimed] = useState(false);
+  const [achievementToast, setAchievementToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -60,6 +61,17 @@ function HomeScreen() {
       if (res.data) setDailyStatus(res.data);
     }).catch(() => {});
   }, [isAuthenticated, navigate, loadGameData]);
+
+  useEffect(() => {
+    const completed = saveData?.achievements?.length ?? 0;
+    const lastSeen = parseInt(localStorage.getItem('lastSeenAchievements') ?? '0');
+    if (completed > lastSeen) {
+      const newCount = completed - lastSeen;
+      setAchievementToast(`${newCount}개의 새로운 업적 달성!`);
+      localStorage.setItem('lastSeenAchievements', String(completed));
+      setTimeout(() => setAchievementToast(null), 3000);
+    }
+  }, [saveData?.achievements?.length]);
 
   const character = useMemo(
     () => CHARACTERS.find((c) => c.id === saveData?.characterId) ?? null,
@@ -119,6 +131,31 @@ function HomeScreen() {
   const handleSkills = useCallback(() => navigate('/skills'), [navigate]);
   const handleAchievements = useCallback(() => navigate('/achievements'), [navigate]);
 
+  const handlePrestige = useCallback(async () => {
+    const nextPrestige = (saveData?.prestigeLevel ?? 0) + 1;
+    const gemReward = 50 * nextPrestige;
+    const confirmed = window.confirm(
+      `환생하시겠습니까?\n\n` +
+      `- 레벨이 1로 초기화됩니다\n` +
+      `- 스킬 레벨이 초기화됩니다\n` +
+      `- 심연 진행도가 초기화됩니다\n` +
+      `- 장비, 강화, 업적, 골드, 젬은 유지됩니다\n\n` +
+      `보상:\n` +
+      `- 환생 레벨 ${nextPrestige} (전 스탯 +${nextPrestige * 2}%)\n` +
+      `- 젬 ${gemReward}개`
+    );
+    if (!confirmed) return;
+    try {
+      const res = await axios.post('/api/game/prestige');
+      if (res.data.success && res.data.saveData) {
+        updateSaveData(res.data.saveData);
+        alert(res.data.message);
+      }
+    } catch {
+      alert('환생에 실패했습니다.');
+    }
+  }, [saveData?.prestigeLevel, updateSaveData]);
+
   const handleClaimDaily = useCallback(async () => {
     try {
       const res = await axios.post('/api/daily/claim');
@@ -136,6 +173,11 @@ function HomeScreen() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 min-h-screen relative">
+      {achievementToast && (
+        <div className="fixed top-4 right-4 z-50 bg-orange-500/90 text-white px-4 py-2 rounded-lg shadow-lg animate-bounce text-sm font-bold">
+          &#127942; {achievementToast}
+        </div>
+      )}
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
         <button type="button" onClick={handleCopy}
@@ -176,10 +218,27 @@ function HomeScreen() {
         </div>
         <h1 className="text-2xl font-bold text-gray-100">{saveData.playerName}</h1>
         <p className="text-sm text-dungeon-accent">{character.title} - {character.name}</p>
-        <p className="text-xs text-yellow-400 mt-1">Lv. {saveData.level}</p>
+        <p className="text-xs text-yellow-400 mt-1">
+          Lv. {saveData.level}
+          {(saveData.prestigeLevel ?? 0) > 0 && (
+            <span className="ml-1 text-purple-400">
+              {'★'.repeat(saveData.prestigeLevel ?? 0)}{' '}
+              <span className="text-[10px]">(환생 {saveData.prestigeLevel})</span>
+            </span>
+          )}
+        </p>
         <div className="w-48 mt-2">
           <StatBar current={saveData.exp} max={expToNext} color="xp" label="EXP" showNumbers />
         </div>
+        {saveData.level >= 60 && (
+          <button
+            type="button"
+            onClick={handlePrestige}
+            className="mt-3 px-4 py-1.5 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-sm font-bold transition-colors border border-purple-500"
+          >
+            환생 (Prestige)
+          </button>
+        )}
       </div>
 
       {/* Stats panel */}
@@ -221,7 +280,7 @@ function HomeScreen() {
       </Card>
 
       {/* Menu buttons */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Card hover onClick={handleDungeon} className="text-center py-8">
           <div className="text-3xl mb-2 text-red-400">&#9876;</div>
           <p className="text-lg font-bold">던전</p>

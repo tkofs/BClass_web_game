@@ -131,3 +131,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 }));
+
+// Setup axios interceptor for 401 handling
+let isRefreshing = false;
+axios.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401 && !isRefreshing) {
+      isRefreshing = true;
+      const saveCode = localStorage.getItem('auth_saveCode');
+      if (saveCode) {
+        try {
+          const res = await axios.post('/api/auth/login', { saveCode });
+          if (res.data.success && res.data.token) {
+            persistAuth(res.data.token, saveCode);
+            if (res.data.data) {
+              useAuthStore.setState({
+                token: res.data.token,
+                saveData: res.data.data,
+                isAuthenticated: true,
+              });
+            }
+            // Retry original request
+            error.config.headers['Authorization'] = `Bearer ${res.data.token}`;
+            isRefreshing = false;
+            return axios(error.config);
+          }
+        } catch {
+          // Re-login failed
+        }
+      }
+      isRefreshing = false;
+      clearAuth();
+      useAuthStore.setState({
+        saveCode: '',
+        token: null,
+        saveData: null,
+        isAuthenticated: false,
+        error: null,
+      });
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);

@@ -124,6 +124,8 @@ export function createNewGame(
     totalKills: 0,
     lastDailyReward: '',
     skillLevels: {},
+    prestigeLevel: 0,
+    lastWeeklyBoss: '',
     createdAt: now,
     lastPlayedAt: now,
   };

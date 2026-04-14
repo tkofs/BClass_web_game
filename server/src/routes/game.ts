@@ -115,4 +115,57 @@ router.post(
   },
 );
 
+// ── POST /prestige ──────────────────────────────────────────
+router.post('/prestige', (req: Request, res: Response): void => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ success: false, message: 'Missing authorization' });
+      return;
+    }
+    const token = authHeader.slice(7);
+    const saveCode = AuthService.verifyToken(token);
+    if (!saveCode) {
+      res.status(401).json({ success: false, message: 'Invalid or expired token' });
+      return;
+    }
+
+    const saveData = AuthService.getSaveData(saveCode);
+    if (!saveData) {
+      res.status(404).json({ success: false, message: 'Save data not found' });
+      return;
+    }
+
+    if (saveData.level < 60) {
+      res.status(400).json({ success: false, message: '환생은 레벨 60 이상에서만 가능합니다' });
+      return;
+    }
+
+    // Increment prestige
+    saveData.prestigeLevel = (saveData.prestigeLevel ?? 0) + 1;
+
+    // Grant gems: 50 * prestigeLevel
+    saveData.gems += 50 * saveData.prestigeLevel;
+
+    // Reset progression
+    saveData.level = 1;
+    saveData.exp = 0;
+    saveData.skillLevels = {};
+    saveData.abyssFloor = 0;
+
+    // Keep: inventory, equippedItems, enhanceLevels, achievements, bestiary, dropHistory, gold, gems, abyssHighest
+
+    AuthService.saveProgress(saveCode, saveData);
+
+    res.json({
+      success: true,
+      message: `환생 완료! 환생 레벨: ${saveData.prestigeLevel}`,
+      saveData,
+    });
+  } catch (err) {
+    console.error('[game/prestige]', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 export default router;

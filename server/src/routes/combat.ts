@@ -487,4 +487,200 @@ router.post(
   },
 );
 
+// ── POST /weekly-boss/start ──────────────────────────────────
+router.post('/weekly-boss/start', (req: Request, res: Response): void => {
+  try {
+    const saveCode = extractSaveCode(req, res);
+    if (!saveCode) return;
+
+    const saveData = AuthService.getSaveData(saveCode);
+    if (!saveData) {
+      res.status(404).json({ success: false, message: 'Save data not found' });
+      return;
+    }
+
+    const result = CombatService.initWeeklyBossBattle(saveData);
+    if ('error' in result) {
+      res.status(400).json({ success: false, message: result.error });
+      return;
+    }
+
+    // Mark attempt time
+    saveData.lastWeeklyBoss = new Date().toISOString();
+    AuthService.saveProgress(saveCode, saveData);
+
+    res.json({
+      success: true,
+      battleState: result.battleState,
+      skillStates: result.skillStates,
+    });
+  } catch (err) {
+    console.error('[combat/weekly-boss/start]', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ── POST /weekly-boss/action ────────────────────────────────
+router.post(
+  '/weekly-boss/action',
+  validate([
+    { name: 'battleId', type: 'string', minLength: 1 },
+    { name: 'skillId', type: 'string', minLength: 1 },
+    { name: 'targetId', type: 'string', minLength: 1 },
+  ]),
+  (req: Request, res: Response): void => {
+    try {
+      const saveCode = extractSaveCode(req, res);
+      if (!saveCode) return;
+
+      const { battleId, skillId, targetId } = req.body;
+
+      const battleState = CombatService.getBattle(battleId);
+      if (!battleState) {
+        res.status(404).json({ success: false, message: 'Battle not found' });
+        return;
+      }
+
+      // Player action
+      const playerResult = CombatService.executePlayerAction(battleState, skillId, targetId);
+      if ('error' in playerResult) {
+        res.status(400).json({ success: false, message: playerResult.error });
+        return;
+      }
+
+      // Check victory after player action
+      const endAfterPlayer = CombatService.checkBattleEnd(battleState);
+      if (endAfterPlayer) {
+        battleState.status = endAfterPlayer;
+
+        if (endAfterPlayer === 'victory') {
+          const saveData = AuthService.getSaveData(saveCode)!;
+
+          // Count kills
+          const deadEnemies = battleState.enemies.filter(e => !e.isAlive).length;
+          if (!saveData.totalKills) saveData.totalKills = 0;
+          saveData.totalKills += deadEnemies;
+
+          const rewards = CombatService.calculateWeeklyBossRewards(battleId, saveData.characterId);
+
+          if (rewards) {
+            const levelUp = GameService.gainExp(saveData, rewards.exp);
+            saveData.gold += rewards.gold;
+            saveData.gems += 10; // Bonus gems
+
+            if (!saveData.dropHistory) saveData.dropHistory = [];
+            for (const drop of rewards.items) {
+              GameService.addItemSmart(saveData, drop.itemId, drop.quantity);
+              const itemDef = ITEMS.find((i: any) => i.id === drop.itemId);
+              if (itemDef && (itemDef.rarity === 'epic' || itemDef.rarity === 'legendary')) {
+                saveData.dropHistory.push({ itemId: drop.itemId, source: '주간 보스', date: new Date().toISOString() });
+              }
+            }
+
+            // Bestiary update
+            for (const enemy of battleState.enemies) {
+              const monsterData = MONSTERS.find((m) => m.id === enemy.monsterId);
+              if (monsterData) {
+                GameService.addBestiaryEntry(saveData, monsterData.id);
+              }
+            }
+
+            AchievementService.checkAchievements(saveData);
+            AuthService.saveProgress(saveCode, saveData);
+            CombatService.removeBattle(battleId);
+
+            res.json({
+              success: true,
+              battleState,
+              skillStates: [],
+              rewards: { ...rewards, gems: 10 },
+              levelUp,
+              saveData,
+            });
+            return;
+          }
+        } else {
+          // Defeat
+          CombatService.removeBattle(battleId);
+          res.json({
+            success: true,
+            battleState,
+            skillStates: [],
+            rewards: null,
+            levelUp: null,
+            saveData: null,
+          });
+          return;
+        }
+      }
+
+      // Enemy turn
+      CombatService.executeEnemyTurn(battleState);
+
+      // Check after enemy turn
+      const endAfterEnemy = CombatService.checkBattleEnd(battleState);
+      if (endAfterEnemy === 'victory') {
+        battleState.status = 'victory';
+        const saveData = AuthService.getSaveData(saveCode)!;
+
+        const deadEnemies2 = battleState.enemies.filter(e => !e.isAlive).length;
+        if (!saveData.totalKills) saveData.totalKills = 0;
+        saveData.totalKills += deadEnemies2;
+
+        const rewards = CombatService.calculateWeeklyBossRewards(battleId, saveData.characterId);
+
+        if (rewards) {
+          const levelUp = GameService.gainExp(saveData, rewards.exp);
+          saveData.gold += rewards.gold;
+          saveData.gems += 10;
+
+          for (const drop of rewards.items) {
+            GameService.addItemSmart(saveData, drop.itemId, drop.quantity);
+          }
+          AchievementService.checkAchievements(saveData);
+          AuthService.saveProgress(saveCode, saveData);
+          CombatService.removeBattle(battleId);
+
+          res.json({
+            success: true,
+            battleState,
+            skillStates: [],
+            rewards: { ...rewards, gems: 10 },
+            levelUp,
+            saveData,
+          });
+          return;
+        }
+      }
+
+      if (endAfterEnemy === 'defeat') {
+        battleState.status = 'defeat';
+        CombatService.removeBattle(battleId);
+
+        res.json({
+          success: true,
+          battleState,
+          skillStates: [],
+          rewards: null,
+          levelUp: null,
+          saveData: null,
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        battleState,
+        skillStates: CombatService.getSkillStates(battleId),
+        rewards: null,
+        levelUp: null,
+        saveData: null,
+      });
+    } catch (err) {
+      console.error('[combat/weekly-boss/action]', err);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  },
+);
+
 export default router;

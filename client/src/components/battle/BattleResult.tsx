@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Modal from '@/components/common/Modal';
 import Button from '@/components/common/Button';
 import { ITEMS } from '@shared/data';
-import type { BattleRewards } from '@shared/types';
+import type { BattleRewards, BattleStats } from '@shared/types';
 import type { LevelUpResult } from '@/stores/types';
 
 interface BattleResultProps {
@@ -13,6 +13,7 @@ interface BattleResultProps {
   onContinue: () => void;
   onRetry: () => void;
   onHome: () => void;
+  stats?: BattleStats | null;
   isAbyss?: boolean;
   abyssFloor?: number | null;
   abyssNextFloor?: number | null;
@@ -27,11 +28,13 @@ const BattleResult = React.memo(function BattleResult({
   onContinue,
   onRetry,
   onHome,
+  stats,
   isAbyss,
   abyssFloor,
   abyssNextFloor,
   onNextFloor,
 }: BattleResultProps) {
+  const [showStats, setShowStats] = useState(false);
   const handleContinue = useCallback(() => onContinue(), [onContinue]);
   const handleRetry = useCallback(() => onRetry(), [onRetry]);
   const handleHome = useCallback(() => onHome(), [onHome]);
@@ -112,6 +115,43 @@ const BattleResult = React.memo(function BattleResult({
               </div>
             )}
           </div>
+
+          {stats && (
+            <div className="border-t border-dungeon-border pt-2">
+              <button
+                type="button"
+                onClick={() => setShowStats((v) => !v)}
+                className="w-full text-left text-xs text-gray-400 hover:text-gray-300 transition-colors flex items-center gap-1"
+              >
+                <span className={`transition-transform ${showStats ? 'rotate-90' : ''}`}>&#9654;</span>
+                전투 통계
+              </button>
+              {showStats && (
+                <div className="mt-2 space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">총 피해량</span>
+                    <span className="text-red-400 font-bold">{stats.totalDamageDealt.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">받은 피해</span>
+                    <span className="text-orange-400 font-bold">{stats.totalDamageTaken.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">최고 치명타</span>
+                    <span className="text-yellow-400 font-bold">{stats.highestCrit > 0 ? stats.highestCrit.toLocaleString() : '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">경과 턴</span>
+                    <span className="text-gray-300">{stats.turnsElapsed}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">사용한 스킬</span>
+                    <span className="text-gray-300">{stats.skillsUsed}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <p className="text-[10px] text-gray-600 text-center">진행 상황이 자동 저장되었습니다</p>
 

@@ -1,3 +1,11 @@
+export interface BattleStats {
+  totalDamageDealt: number;
+  totalDamageTaken: number;
+  highestCrit: number;
+  turnsElapsed: number;
+  skillsUsed: number;
+}
+
 export interface BattleState {
   id: string;
   status: 'waiting' | 'player_turn' | 'enemy_turn' | 'animating' | 'victory' | 'defeat';
@@ -6,6 +14,7 @@ export interface BattleState {
   enemies: BattleFighter[];
   actionQueue: BattleAction[];
   log: BattleLogEntry[];
+  stats?: BattleStats;
 }
 
 export interface BattleFighter {

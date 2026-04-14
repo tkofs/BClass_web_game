@@ -3,6 +3,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCombat } from '@/hooks/useCombat';
 import { useCombatStore } from '@/stores/combatStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useAuth } from '@/hooks/useAuth';
 import { SKILLS, ITEMS } from '@shared/data';
 import StatBar from '@/components/common/StatBar';
@@ -30,7 +31,7 @@ const EnemyCard = React.memo(function EnemyCard({
       type="button"
       onClick={handleClick}
       disabled={!enemy.isAlive}
-      className={`panel p-3 transition-all duration-200 min-w-[120px] ${
+      className={`panel p-2 sm:p-3 transition-all duration-200 min-w-[100px] sm:min-w-[120px] ${
         !enemy.isAlive
           ? 'opacity-30 cursor-not-allowed'
           : isSelected
@@ -68,8 +69,10 @@ function BattleScreen() {
     error: combatError,
     startBattle,
     startAbyssBattle,
+    startWeeklyBossBattle,
     useSkill,
     useAbyssSkill,
+    useWeeklyBossSkill,
     getSkillStates,
     resetBattle,
     useBattleItem,
@@ -78,16 +81,20 @@ function BattleScreen() {
   } = useCombat();
 
   const isAbyssMode = dungeonId === 'abyss';
+  const isWeeklyBossMode = dungeonId === 'weekly_boss';
 
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [flashEnemies, setFlashEnemies] = useState<Set<string>>(new Set());
   const [healFlash, setHealFlash] = useState(false);
   const [skillText, setSkillText] = useState<string | null>(null);
   const [autoBattle, setAutoBattle] = useState(false);
+  const [battleSpeed, setBattleSpeed] = useState(1);
   const logRef = useRef<HTMLDivElement>(null);
   const autoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const handleSkillSelectRef = useRef<(skillId: string) => Promise<void>>();
   const handleNextFloorRef = useRef<() => void>();
+  const useBattleItemRef = useRef(useBattleItem);
+  useBattleItemRef.current = useBattleItem;
 
   // Auto-scroll battle log
   useEffect(() => {
@@ -105,10 +112,12 @@ function BattleScreen() {
     resetBattle();
     if (isAbyssMode) {
       startAbyssBattle();
+    } else if (isWeeklyBossMode) {
+      startWeeklyBossBattle();
     } else if (dungeonId) {
       startBattle(dungeonId);
     }
-  }, [dungeonId, isAbyssMode, isAuthenticated, navigate, resetBattle, startBattle, startAbyssBattle]);
+  }, [dungeonId, isAbyssMode, isWeeklyBossMode, isAuthenticated, navigate, resetBattle, startBattle, startAbyssBattle, startWeeklyBossBattle]);
 
   // Auto-select first alive enemy
   useEffect(() => {
@@ -157,7 +166,9 @@ function BattleScreen() {
 
       const result = isAbyssMode
         ? await useAbyssSkill(skillId, targetId)
-        : await useSkill(skillId, targetId);
+        : isWeeklyBossMode
+          ? await useWeeklyBossSkill(skillId, targetId)
+          : await useSkill(skillId, targetId);
 
       if (result?.saveData) {
         updateSaveData(result.saveData);
@@ -165,7 +176,7 @@ function BattleScreen() {
 
       // Show skill name floating text
       setSkillText(skill.name);
-      setTimeout(() => setSkillText(null), 800);
+      setTimeout(() => setSkillText(null), 800 / battleSpeed);
 
       // Check new log entries for damage/heal
       const newLog = useCombatStore.getState().battleLog;
@@ -183,15 +194,15 @@ function BattleScreen() {
           hitIds.add(targetId);
         }
         setFlashEnemies(hitIds);
-        setTimeout(() => setFlashEnemies(new Set()), 300);
+        setTimeout(() => setFlashEnemies(new Set()), 300 / battleSpeed);
       }
 
       if (hasHeal) {
         setHealFlash(true);
-        setTimeout(() => setHealFlash(false), 300);
+        setTimeout(() => setHealFlash(false), 300 / battleSpeed);
       }
     },
-    [selectedTargetId, useSkill, useAbyssSkill, isAbyssMode, updateSaveData],
+    [selectedTargetId, useSkill, useAbyssSkill, useWeeklyBossSkill, isAbyssMode, isWeeklyBossMode, updateSaveData, battleSpeed],
   );
 
   const handleContinue = useCallback(() => {
@@ -252,6 +263,17 @@ function BattleScreen() {
       // Only act on player turn and not animating
       if (battle.status !== 'player_turn' || state.isAnimating) return;
 
+      // Auto potion when HP < 30%
+      if (battle.player.currentHp / battle.player.maxHp < 0.3) {
+        const authState = useAuthStore.getState();
+        const inv = authState.saveData?.inventory;
+        const hpPotion = inv?.find((s: any) => s.itemId.startsWith('hp_potion') && s.quantity > 0);
+        if (hpPotion) {
+          useBattleItemRef.current(hpPotion.itemId);
+          return;
+        }
+      }
+
       // Pick best skill: highest damageMultiplier with cooldown=0 and sufficient MP
       const playerMp = battle.player.currentMp;
       const skillStates = state.skillStates;
@@ -294,7 +316,7 @@ function BattleScreen() {
       }
 
       handleSkillSelectRef.current?.(chosenSkillId);
-    }, 500);
+    }, 500 / battleSpeed);
 
     return () => {
       if (autoIntervalRef.current) {
@@ -302,7 +324,7 @@ function BattleScreen() {
         autoIntervalRef.current = null;
       }
     };
-  }, [autoBattle, isAbyssMode, saveData?.characterId]);
+  }, [autoBattle, battleSpeed, isAbyssMode, saveData?.characterId]);
 
   // Keyboard shortcut: 'a' toggles auto-battle
   useEffect(() => {
@@ -335,9 +357,9 @@ function BattleScreen() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 min-h-screen flex flex-col">
+    <div className="max-w-4xl mx-auto p-2 sm:p-4 min-h-screen flex flex-col">
       {/* Turn indicator */}
-      <div className="text-center mb-2 flex items-center justify-center gap-3">
+      <div className="text-center mb-2 flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
         {isAbyssMode && abyssFloor !== null && (
           <span className="text-sm font-bold text-purple-400">
             심연 {abyssFloor}층 {abyssFloor > 0 && abyssFloor % 10 === 0 ? '(BOSS)' : ''}
@@ -367,6 +389,17 @@ function BattleScreen() {
         >
           자동 전투 {autoBattle ? 'ON' : 'OFF'}
         </button>
+        <button
+          type="button"
+          onClick={() => setBattleSpeed((s) => (s >= 3 ? 1 : s + 1))}
+          className={`px-3 py-1 text-xs font-bold rounded-lg border transition-colors ${
+            battleSpeed > 1
+              ? 'border-yellow-500 text-yellow-400 bg-yellow-900/30'
+              : 'border-dungeon-border text-gray-400 hover:border-gray-500'
+          }`}
+        >
+          x{battleSpeed}
+        </button>
       </div>
 
       {/* Error display */}
@@ -392,7 +425,7 @@ function BattleScreen() {
       {/* Battle log */}
       <div
         ref={logRef}
-        className="flex-1 min-h-[160px] max-h-[220px] overflow-y-auto panel mb-4 text-sm space-y-1"
+        className="flex-1 min-h-[100px] sm:min-h-[160px] max-h-[160px] sm:max-h-[220px] overflow-y-auto panel mb-4 text-xs sm:text-sm space-y-1"
       >
         {battleLog.length === 0 && (
           <p className="text-gray-600 text-center">전투가 시작됩니다...</p>
@@ -491,6 +524,7 @@ function BattleScreen() {
         onContinue={handleContinue}
         onRetry={handleRetry}
         onHome={handleHome}
+        stats={battleState?.stats}
         isAbyss={isAbyssMode}
         abyssFloor={abyssFloor}
         abyssNextFloor={abyssNextFloor}

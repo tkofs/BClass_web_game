@@ -701,7 +701,7 @@ function InventoryScreen() {
           {/* Equipped slots */}
           <Card className="p-4">
             <h2 className="text-sm font-bold text-gray-400 mb-3">착용 중인 장비</h2>
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
               {equippedSlots.map((slot) => (
                 <EquippedSlot
                   key={slot.slotName}

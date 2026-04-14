@@ -79,6 +79,9 @@ web_game/
 - `GET /api/inventory/enhance-info/:itemId` - 강화 정보
 - `POST /api/combat/abyss/start` - 무한던전 시작
 - `POST /api/combat/abyss/action` - 무한던전 전투 액션
+- `POST /api/game/prestige` - 환생 (레벨 60+ 시 레벨 리셋, 영구 스탯 보너스)
+- `POST /api/combat/weekly-boss/start` - 주간 보스 전투 시작
+- `POST /api/combat/weekly-boss/action` - 주간 보스 전투 액션
 
 ## Damage Formula
 

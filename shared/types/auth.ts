@@ -20,6 +20,8 @@ export interface SaveData {
   totalKills: number;
   lastDailyReward: string;
   skillLevels: Record<string, number>;  // skillId → level
+  prestigeLevel: number;
+  lastWeeklyBoss: string;  // ISO date of last weekly boss attempt
   createdAt: string;
   lastPlayedAt: string;
 }

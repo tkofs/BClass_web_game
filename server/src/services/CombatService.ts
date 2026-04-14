@@ -115,6 +115,13 @@ export function initBattle(
   baseAtk = Math.round(baseAtk * (1 + statMods.atkPercent / 100));
   baseDef = Math.round(baseDef * (1 + statMods.defPercent / 100));
 
+  // Prestige bonus
+  const prestigeBonus = 1 + (saveData.prestigeLevel ?? 0) * 0.02;
+  baseHp = Math.round(baseHp * prestigeBonus);
+  baseMp = Math.round(baseMp * prestigeBonus);
+  baseAtk = Math.round(baseAtk * prestigeBonus);
+  baseDef = Math.round(baseDef * prestigeBonus);
+
   const player: BattleFighter = {
     id: 'player',
     name: saveData.playerName,
@@ -165,6 +172,7 @@ export function initBattle(
     enemies,
     actionQueue: [],
     log: [{ turn: 1, message: `${dungeon.name} - Wave ${waveIndex + 1} 전투 시작!`, type: 'system' }],
+    stats: { totalDamageDealt: 0, totalDamageTaken: 0, highestCrit: 0, turnsElapsed: 0, skillsUsed: 0 },
   };
 
   // Initialize skill states (all cooldowns at 0)
@@ -359,6 +367,11 @@ export function executePlayerAction(
 
   const results: BattleResult[] = [];
 
+  // Track skill usage
+  if (battleState.stats) {
+    battleState.stats.skillsUsed += 1;
+  }
+
   for (const target of targets) {
     const isCrit = Math.random() < baseCritRate;
     let damage = 0;
@@ -382,6 +395,14 @@ export function executePlayerAction(
 
       target.currentHp = Math.max(0, target.currentHp - damage);
       target.isAlive = target.currentHp > 0;
+
+      // Track battle stats
+      if (battleState.stats && damage > 0) {
+        battleState.stats.totalDamageDealt += damage;
+        if (isCrit && damage > battleState.stats.highestCrit) {
+          battleState.stats.highestCrit = damage;
+        }
+      }
 
       // Set active: lifesteal_on_crit (크리 흡혈)
       if (isCrit) {
@@ -526,6 +547,11 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
     player.currentHp = Math.max(0, player.currentHp - damage);
     player.isAlive = player.currentHp > 0;
 
+    // Track damage taken
+    if (battleState.stats && damage > 0) {
+      battleState.stats.totalDamageTaken += damage;
+    }
+
     // Set active: reflect (피해 반사)
     if (damage > 0 && player.isAlive) {
       const setActives = battleSetActiveMap.get(battleState.id) ?? [];
@@ -626,6 +652,11 @@ export function executeEnemyTurn(battleState: BattleState): BattleResult[] {
   // Advance turn
   battleState.turn += 1;
   battleState.status = 'player_turn';
+
+  // Track turns elapsed
+  if (battleState.stats) {
+    battleState.stats.turnsElapsed += 1;
+  }
 
   // Check battle end
   const endStatus = checkBattleEnd(battleState);
@@ -907,6 +938,7 @@ export function removeBattle(id: string): void {
   battleSkillLevelMap.delete(id);
   battleWaveMap.delete(id);
   abyssFloorMap.delete(id);
+  weeklyBossMap.delete(id);
 }
 
 // ────────────────────────────────────────────────────────────
@@ -977,6 +1009,13 @@ export function initAbyssBattle(
   baseAtk = Math.round(baseAtk * (1 + statMods.atkPercent / 100));
   baseDef = Math.round(baseDef * (1 + statMods.defPercent / 100));
 
+  // Prestige bonus
+  const prestigeBonusAbyss = 1 + (saveData.prestigeLevel ?? 0) * 0.02;
+  baseHp = Math.round(baseHp * prestigeBonusAbyss);
+  baseMp = Math.round(baseMp * prestigeBonusAbyss);
+  baseAtk = Math.round(baseAtk * prestigeBonusAbyss);
+  baseDef = Math.round(baseDef * prestigeBonusAbyss);
+
   const player: BattleFighter = {
     id: 'player',
     name: saveData.playerName,
@@ -1043,7 +1082,9 @@ export function initAbyssBattle(
     turn: 1,
     player,
     enemies,
+    actionQueue: [],
     log: [],
+    stats: { totalDamageDealt: 0, totalDamageTaken: 0, highestCrit: 0, turnsElapsed: 0, skillsUsed: 0 },
   };
 
   const characterSkills = SKILLS.filter((s) => s.characterId === saveData.characterId || s.characterId === 'common');
@@ -1144,4 +1185,155 @@ function rollAbyssNormalRarity(floor: number): string | null {
     if (roll <= 0) return w.rarity;
   }
   return weights[weights.length - 1].rarity;
+}
+
+// ────────────────────────────────────────────────────────────
+// Weekly Boss
+// ────────────────────────────────────────────────────────────
+
+const weeklyBossMap = new Map<string, boolean>(); // battleId → isWeeklyBoss
+
+export function isWeeklyBoss(battleId: string): boolean {
+  return weeklyBossMap.get(battleId) === true;
+}
+
+export function initWeeklyBossBattle(
+  saveData: SaveData,
+): { battleState: BattleState; skillStates: SkillState[]; error?: never } | { error: string } {
+  // Check weekly cooldown
+  const lastAttempt = saveData.lastWeeklyBoss ?? '';
+  if (lastAttempt) {
+    const lastDate = new Date(lastAttempt);
+    const now = new Date();
+    const diffMs = now.getTime() - lastDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays < 7) {
+      const remaining = Math.ceil(7 - diffDays);
+      return { error: `주간 보스는 일주일에 한 번만 도전할 수 있습니다. ${remaining}일 후 재도전 가능` };
+    }
+  }
+
+  const character = CHARACTERS.find((c) => c.id === saveData.characterId);
+  if (!character) return { error: 'Character data not found' };
+
+  // Player stats (same as initBattle)
+  const levelBonus = saveData.level - 1;
+  let equipHp = 0, equipMp = 0, equipAtk = 0, equipDef = 0, equipSpd = 0;
+  let equipCritRate = 0, equipCritDmg = 0;
+
+  for (const slotItemId of Object.values(saveData.equippedItems)) {
+    if (!slotItemId) continue;
+    const itemDef = ITEMS.find((i) => i.id === slotItemId);
+    if (!itemDef?.stats) continue;
+    const enh = saveData.enhanceLevels?.[slotItemId];
+    const mult = 1 + (enh?.level ?? 0);
+    equipHp += (itemDef.stats.hp ?? 0) * mult;
+    equipMp += (itemDef.stats.mp ?? 0) * mult;
+    equipAtk += (itemDef.stats.attack ?? 0) * mult;
+    equipDef += (itemDef.stats.defense ?? 0) * mult;
+    equipSpd += (itemDef.stats.speed ?? 0) * mult;
+    equipCritRate += (itemDef.stats.critRate ?? 0) * mult;
+    equipCritDmg += (itemDef.stats.critDamage ?? 0) * mult;
+  }
+
+  // Set bonuses
+  const equippedIds = Object.values(saveData.equippedItems).filter(Boolean) as string[];
+  const { statMods, actives: setActives } = calculateSetBonuses(equippedIds);
+
+  let baseHp = character.baseStats.maxHp + levelBonus * 15 + equipHp;
+  let baseMp = character.baseStats.maxMp + levelBonus * 5 + equipMp;
+  let baseAtk = character.baseStats.attack + levelBonus * 3 + equipAtk;
+  let baseDef = character.baseStats.defense + levelBonus * 2 + equipDef;
+
+  baseHp = Math.round(baseHp * (1 + statMods.hpPercent / 100));
+  baseMp = Math.round(baseMp * (1 + statMods.mpPercent / 100));
+  baseAtk = Math.round(baseAtk * (1 + statMods.atkPercent / 100));
+  baseDef = Math.round(baseDef * (1 + statMods.defPercent / 100));
+
+  // Prestige bonus
+  const prestigeBonusWb = 1 + (saveData.prestigeLevel ?? 0) * 0.02;
+  baseHp = Math.round(baseHp * prestigeBonusWb);
+  baseMp = Math.round(baseMp * prestigeBonusWb);
+  baseAtk = Math.round(baseAtk * prestigeBonusWb);
+  baseDef = Math.round(baseDef * prestigeBonusWb);
+
+  const player: BattleFighter = {
+    id: 'player',
+    name: saveData.playerName,
+    currentHp: baseHp,
+    maxHp: baseHp,
+    currentMp: baseMp,
+    maxMp: baseMp,
+    attack: baseAtk,
+    defense: baseDef,
+    speed: character.baseStats.speed + levelBonus * 1 + equipSpd,
+    statusEffects: [],
+    isAlive: true,
+  };
+
+  // Pick a random boss and give it 3x stats
+  const bossId = BOSS_MONSTER_IDS[Math.floor(Math.random() * BOSS_MONSTER_IDS.length)];
+  const bossData = MONSTERS.find((m) => m.id === bossId)!;
+  const weeklyMult = 3;
+
+  const enemies: BattleFighter[] = [{
+    id: 'enemy_0',
+    name: `[주간] ${bossData.name}`,
+    monsterId: bossData.id,
+    currentHp: Math.floor(bossData.stats.maxHp * weeklyMult),
+    maxHp: Math.floor(bossData.stats.maxHp * weeklyMult),
+    currentMp: 0,
+    maxMp: 0,
+    attack: Math.floor(bossData.stats.attack * weeklyMult),
+    defense: Math.floor(bossData.stats.defense * weeklyMult),
+    speed: Math.floor(bossData.stats.speed * weeklyMult),
+    statusEffects: [],
+    isAlive: true,
+  }];
+
+  const battleState: BattleState = {
+    id: uuidv4(),
+    status: 'player_turn',
+    turn: 1,
+    player,
+    enemies,
+    actionQueue: [],
+    log: [{ turn: 1, message: `주간 보스 - ${bossData.name} 전투 시작!`, type: 'system' }],
+    stats: { totalDamageDealt: 0, totalDamageTaken: 0, highestCrit: 0, turnsElapsed: 0, skillsUsed: 0 },
+  };
+
+  const characterSkills = SKILLS.filter((s) => s.characterId === saveData.characterId || s.characterId === 'common');
+  const skillStates: SkillState[] = characterSkills.map((s) => ({
+    skillId: s.id,
+    currentCooldown: 0,
+    isAvailable: s.type === 'active',
+  }));
+
+  battleStore.set(battleState.id, battleState);
+  skillStateStore.set(battleState.id, skillStates);
+  battleDungeonMap.set(battleState.id, '__weekly_boss__');
+  battleCritMap.set(battleState.id, {
+    critRate: character.baseStats.critRate + equipCritRate + statMods.critRateFlat,
+    critDamage: (character.baseStats.critDamage + equipCritDmg) * (1 + statMods.critDmgPercent / 100),
+  });
+  battleSetActiveMap.set(battleState.id, setActives);
+  battleSkillLevelMap.set(battleState.id, { ...(saveData.skillLevels ?? {}) });
+  weeklyBossMap.set(battleState.id, true);
+
+  return { battleState, skillStates };
+}
+
+export function calculateWeeklyBossRewards(battleId: string, characterId: string): BattleRewards | null {
+  const battleState = battleStore.get(battleId);
+  if (!battleState) return null;
+
+  const items: { itemId: string; quantity: number }[] = [];
+
+  // Guaranteed legendary drop
+  const equipId = rollEquipment(characterId, 'legendary');
+  if (equipId) {
+    items.push({ itemId: equipId, quantity: 1 });
+  }
+
+  return { exp: 30000, gold: 50000, items };
 }
