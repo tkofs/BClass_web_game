@@ -81,8 +81,6 @@ const PEG_RADIUS = 5;
 // Layout
 const PEG_START_Y = 120;
 const PEG_END_Y = 480;
-const PEG_ROWS = 9;
-const PEG_SPACING_Y = (PEG_END_Y - PEG_START_Y) / (PEG_ROWS - 1);
 
 const POCKET_TOP_Y = 550;
 const POCKET_BOTTOM_Y = 670;
@@ -117,18 +115,24 @@ interface Spark {
   color: string;
 }
 
-/* ── Build pegs ── */
+/* ── Build pegs (triangle shape: narrow top, wide bottom) ── */
 function buildPegs(): { x: number; y: number }[] {
   const pegs: { x: number; y: number }[] = [];
-  for (let row = 0; row < PEG_ROWS; row++) {
+  const totalRows = 12;
+  const minCols = 3;  // top row
+  const maxCols = 11; // bottom row (covers full width)
+  for (let row = 0; row < totalRows; row++) {
+    const t = row / (totalRows - 1); // 0 at top, 1 at bottom
+    const cols = Math.round(minCols + t * (maxCols - minCols));
     const even = row % 2 === 0;
-    const count = even ? 4 : 5;
-    const totalSpan = (count - 1) * 50;
-    const startX = (CANVAS_W - totalSpan) / 2;
-    for (let col = 0; col < count; col++) {
+    const actualCols = even ? cols : cols + 1;
+    const spacing = (CANVAS_W - 40) / (actualCols);
+    const startX = 20 + spacing / 2;
+    const y = PEG_START_Y + row * ((PEG_END_Y - PEG_START_Y) / (totalRows - 1));
+    for (let col = 0; col < actualCols; col++) {
       pegs.push({
-        x: startX + col * 50,
-        y: PEG_START_Y + row * PEG_SPACING_Y,
+        x: startX + col * spacing + (even ? 0 : spacing * 0.5 - spacing / (actualCols) * 0.5),
+        y,
       });
     }
   }
@@ -290,12 +294,6 @@ function PachinkoScreen() {
         ball.vy = Math.abs(ball.vy) * BOUNCE_DAMPING;
       }
 
-      // Subtle bias toward target pocket in lower third
-      if (ball.y > PEG_END_Y && ball.targetSlot >= 0) {
-        const targetX = getPocketCenterX(ball.targetSlot);
-        const diff = targetX - ball.x;
-        ball.vx += diff * 0.003;
-      }
 
       // Funnel walls at top of pocket area
       if (ball.y >= POCKET_TOP_Y - 20 && ball.y < POCKET_TOP_Y) {
@@ -331,25 +329,27 @@ function PachinkoScreen() {
           ball.vy = 0;
           ball.vx = 0;
 
-          // Determine visual slot
-          const slot = Math.max(0, Math.min(SLOT_COUNT - 1, Math.floor(ball.x / POCKET_W)));
-          ball.resultSlot = slot;
+          // Determine visual slot from actual position
+          const visualSlot = Math.max(0, Math.min(SLOT_COUNT - 1, Math.floor(ball.x / POCKET_W)));
+          // Use server result (targetSlot) for reward, visual pocket for display
+          const rewardSlot = ball.targetSlot >= 0 ? ball.targetSlot : visualSlot;
+          ball.resultSlot = visualSlot;
 
           // Snap to pocket center
-          ball.x = getPocketCenterX(slot);
+          ball.x = getPocketCenterX(visualSlot);
           ball.y = POCKET_BOTTOM_Y - ball.radius - 5;
 
-          // Flash pocket
-          pocketFlashRef.current[slot] = 1.0;
+          // Flash the visual pocket
+          pocketFlashRef.current[visualSlot] = 1.0;
 
-          // Jackpot flash
-          if (ball.targetSlot === 8) {
+          // Jackpot flash (check server result)
+          if (rewardSlot === 8) {
             jackpotFlashRef.current = 1.0;
             setJackpotFlash(1);
           }
 
-          // Update running tally
-          const cfg = SLOT_CONFIG[ball.targetSlot];
+          // Update running tally using server result
+          const cfg = SLOT_CONFIG[rewardSlot];
           if (cfg) {
             setRunningTally(prev => ({
               ...prev,
