@@ -151,6 +151,9 @@ router.post(
 );
 
 // ── POST /prestige ──────────────────────────────────────────
+const VALID_BLESSING_TYPES = ['warrior', 'sage', 'plunderer', 'guardian'] as const;
+type BlessingType = typeof VALID_BLESSING_TYPES[number];
+
 router.post('/prestige', (req: Request, res: Response): void => {
   try {
     const authHeader = req.headers.authorization;
@@ -171,8 +174,29 @@ router.post('/prestige', (req: Request, res: Response): void => {
       return;
     }
 
-    if (saveData.level < 60) {
-      res.status(400).json({ success: false, message: '환생은 레벨 60 이상에서만 가능합니다' });
+    // Validate blessing type
+    const { blessingType } = req.body as { blessingType?: string };
+    if (!blessingType || !VALID_BLESSING_TYPES.includes(blessingType as BlessingType)) {
+      res.status(400).json({ success: false, message: '축복 유형을 선택해야 합니다' });
+      return;
+    }
+
+    // Guardian blessing requires prestige >= 25
+    if (blessingType === 'guardian' && (saveData.prestigeLevel ?? 0) < 25) {
+      res.status(400).json({ success: false, message: '수호자의 축복은 환생 25회 이상에서 해금됩니다' });
+      return;
+    }
+
+    // Check max level condition: 300 + prestigeLevel
+    const maxLevel = 300 + (saveData.prestigeLevel ?? 0);
+    if (saveData.level < maxLevel) {
+      res.status(400).json({ success: false, message: `환생은 최대 레벨(${maxLevel})에 도달해야 합니다 (현재: ${saveData.level})` });
+      return;
+    }
+
+    // Check trial boss cleared (skip if prestige >= 10 milestone)
+    if ((saveData.prestigeLevel ?? 0) < 10 && !saveData.prestigeTrialCleared) {
+      res.status(400).json({ success: false, message: '시련 보스를 먼저 처치해야 합니다' });
       return;
     }
 
@@ -199,13 +223,29 @@ router.post('/prestige', (req: Request, res: Response): void => {
     saveData.prestigeLevel = newPrestige;
     saveData.gems += totalGems;
 
+    // Apply blessing
+    saveData.prestigeBlessingType = blessingType as BlessingType;
+    saveData.prestigeTrialCleared = false;
+
     // Reset progression (with artifact keep bonuses)
     const keptLevel = Math.max(1, Math.floor(currentLevel * levelKeepPercent / 100));
     const keptAbyssFloor = Math.floor(currentAbyssFloor * abyssKeepPercent / 100);
 
     saveData.level = keptLevel;
     saveData.exp = 0;
-    saveData.skillLevels = {};
+
+    // Skill levels: warrior blessing keeps 20%
+    if (blessingType === 'warrior' && saveData.skillLevels) {
+      const keptSkills: Record<string, number> = {};
+      for (const [skillId, level] of Object.entries(saveData.skillLevels)) {
+        const kept = Math.floor(level * 0.2);
+        if (kept > 0) keptSkills[skillId] = kept;
+      }
+      saveData.skillLevels = keptSkills;
+    } else {
+      saveData.skillLevels = {};
+    }
+
     // Reset passive tree on prestige
     saveData.passiveTree = { allocatedNodes: [] };
     // Legacy talent reset (keep premium for backwards compat)
@@ -220,11 +260,24 @@ router.post('/prestige', (req: Request, res: Response): void => {
     const currentGold = saveData.gold;
     saveData.gold = Math.floor(currentGold * goldKeepPercent / 100);
 
+    // Apply milestone unlocks (once set, never unset)
+    if (newPrestige >= 50) saveData.dualPetUnlocked = true;
+    if (newPrestige >= 100) saveData.extraSkillSlot = true;
+    if (newPrestige >= 200) saveData.critOverflow = true;
+
     // Keep: inventory, equippedItems, enhanceLevels, achievements, bestiary, dropHistory, gems, abyssHighest, artifacts
 
     AuthService.saveProgress(saveCode, saveData);
 
+    const blessingLabels: Record<string, string> = {
+      warrior: '전사의 유산',
+      sage: '현자의 지혜',
+      plunderer: '약탈자의 행운',
+      guardian: '수호자의 축복',
+    };
+
     const extraInfo = [];
+    extraInfo.push(`축복: ${blessingLabels[blessingType]}`);
     if (gemBoostPercent > 0) extraInfo.push(`젬 부스트 +${gemBoostPercent}%`);
     if (keptLevel > 1) extraInfo.push(`레벨 유지 Lv.${keptLevel}`);
     if (keptAbyssFloor > 0) extraInfo.push(`심연 유지 ${keptAbyssFloor}층`);
@@ -232,7 +285,7 @@ router.post('/prestige', (req: Request, res: Response): void => {
 
     res.json({
       success: true,
-      message: `환생 완료! 환생 Lv.${newPrestige} | 젬 +${totalGems}${extraInfo.length > 0 ? ' | ' + extraInfo.join(', ') : ''}`,
+      message: `환생 완료! 환생 Lv.${newPrestige} | 젬 +${totalGems} | ${extraInfo.join(', ')}`,
       saveData,
       gemBreakdown: { base: baseGems, level: levelBonus, abyss: abyssBonus, gemBoost: gemBoostPercent, total: totalGems },
     });

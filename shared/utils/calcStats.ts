@@ -143,6 +143,12 @@ export function calculateTotalStats(saveData: SaveData): TotalStats {
   atk = Math.round(atk * pBonus);
   def = Math.round(def * pBonus);
 
+  // ── 6b. Prestige Blessing ──
+  if (saveData.prestigeBlessingType === 'warrior') {
+    atk = Math.round(atk * 1.05);
+    def = Math.round(def * 1.05);
+  }
+
   // ── 7. Passive Tree ──
   const passiveBonuses = calculatePassiveTreeBonuses(saveData.passiveTree?.allocatedNodes ?? []);
   atk = Math.round(atk * (1 + passiveBonuses.atkPercent / 100));
@@ -167,7 +173,9 @@ export function calculateTotalStats(saveData: SaveData): TotalStats {
     const pet = PETS.find((p) => p.id === saveData.activePet);
     if (pet) {
       const petLevel = saveData.petLevels?.[saveData.activePet] ?? 0;
-      const petMult = 1 + petLevel * 0.1;
+      let petMult = 1 + petLevel * 0.1;
+      // Guardian blessing doubles pet bonus
+      if (saveData.prestigeBlessingType === 'guardian') petMult *= 2;
       for (const b of pet.bonus) {
         if (b.stat === 'atkPercent') atk = Math.round(atk * (1 + b.value * petMult / 100));
         if (b.stat === 'defPercent') def = Math.round(def * (1 + b.value * petMult / 100));
@@ -199,6 +207,15 @@ export function calculateTotalStats(saveData: SaveData): TotalStats {
   let bonusExp = pLvl * 10 + randOptExpPct;
   let bonusGold = pLvl * 5 + passiveBonuses.goldPercent + randOptGoldPct;
   let bonusDrop = pLvl * 1;
+
+  // Prestige blessing bonuses
+  if (saveData.prestigeBlessingType === 'sage') {
+    bonusExp += 30;
+  }
+  if (saveData.prestigeBlessingType === 'plunderer') {
+    bonusGold += 25;
+    bonusDrop += 25;
+  }
 
   bonusExp += artBonuses['expPercent'] ?? 0;
   bonusGold += artBonuses['goldPercent'] ?? 0;

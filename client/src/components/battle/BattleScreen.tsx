@@ -109,9 +109,11 @@ function BattleScreen() {
     startBattle,
     startAbyssBattle,
     startWeeklyBossBattle,
+    startPrestigeTrialBattle,
     useSkill,
     useAbyssSkill,
     useWeeklyBossSkill,
+    usePrestigeTrialSkill,
     getSkillStates,
     resetBattle,
     useBattleItem,
@@ -121,6 +123,7 @@ function BattleScreen() {
 
   const isAbyssMode = dungeonId === 'abyss';
   const isWeeklyBossMode = dungeonId === 'weekly_boss';
+  const isTrialMode = dungeonId === 'prestige_trial';
 
   const dungeonBg = getDungeonBackground(dungeonId ?? '');
   const playerSprites = CLASS_SPRITES[saveData?.characterId ?? ''] ?? CLASS_SPRITES.dark_knight;
@@ -167,10 +170,12 @@ function BattleScreen() {
       startAbyssBattle();
     } else if (isWeeklyBossMode) {
       startWeeklyBossBattle();
+    } else if (isTrialMode) {
+      startPrestigeTrialBattle();
     } else if (dungeonId) {
       startBattle(dungeonId);
     }
-  }, [dungeonId, isAbyssMode, isWeeklyBossMode, isAuthenticated, navigate, resetBattle, startBattle, startAbyssBattle, startWeeklyBossBattle]);
+  }, [dungeonId, isAbyssMode, isWeeklyBossMode, isTrialMode, isAuthenticated, navigate, resetBattle, startBattle, startAbyssBattle, startWeeklyBossBattle, startPrestigeTrialBattle]);
 
   // Clear stale effects when enemies change (new wave)
   const prevEnemyIds = useRef('');
@@ -282,7 +287,9 @@ function BattleScreen() {
         ? await useAbyssSkill(skillId, targetId)
         : isWeeklyBossMode
           ? await useWeeklyBossSkill(skillId, targetId)
-          : await useSkill(skillId, targetId);
+          : isTrialMode
+            ? await usePrestigeTrialSkill(skillId, targetId)
+            : await useSkill(skillId, targetId);
 
       if (result?.saveData) {
         updateSaveData(result.saveData);

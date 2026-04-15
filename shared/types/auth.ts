@@ -39,6 +39,11 @@ export interface SaveData {
   passiveTree: { allocatedNodes: string[] };
   blessings: { type: string; expiresAt: string }[];
   appearance: { color: string };
+  prestigeBlessingType?: 'warrior' | 'sage' | 'plunderer' | 'guardian';
+  prestigeTrialCleared?: boolean;
+  dualPetUnlocked?: boolean;
+  extraSkillSlot?: boolean;
+  critOverflow?: boolean;
   createdAt: string;
   lastPlayedAt: string;
 }

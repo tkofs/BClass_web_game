@@ -1722,3 +1722,127 @@ export function calculateWeeklyBossRewards(battleId: string, characterId: string
 
   return { exp: 30000, gold: 50000, items };
 }
+
+// ────────────────────────────────────────────────────────────
+// Prestige Trial Boss
+// ────────────────────────────────────────────────────────────
+
+export function initPrestigeTrialBattle(
+  saveData: SaveData,
+): { battleState: BattleState; skillStates: SkillState[]; error?: never } | { error: string } {
+  const character = CHARACTERS.find((c) => c.id === saveData.characterId);
+  if (!character) return { error: 'Character data not found' };
+
+  const totalStats = calculateTotalStats(saveData);
+  const prestigeLv = saveData.prestigeLevel ?? 0;
+  const scaleMult = 1 + prestigeLv * 0.01;
+
+  // Trial boss stats scale with player
+  const bossHp = Math.round(totalStats.atk * 50 * scaleMult);
+  const bossAtk = Math.round(totalStats.def * 3 * scaleMult);
+  const bossDef = Math.round(totalStats.atk * 0.3 * scaleMult);
+  const bossSpd = Math.round(totalStats.spd * 0.9);
+
+  // Boss pattern: extra abilities at higher prestige
+  const bossName = prestigeLv >= 30 ? '시련의 대수호자' : prestigeLv >= 10 ? '시련의 상급 수호자' : '시련의 수호자';
+
+  const enemies: BattleFighter[] = [{
+    id: 'enemy_0',
+    name: bossName,
+    monsterId: 'prestige_trial_boss',
+    currentHp: bossHp,
+    maxHp: bossHp,
+    currentMp: 0,
+    maxMp: 0,
+    attack: bossAtk,
+    defense: bossDef,
+    speed: bossSpd,
+    statusEffects: [],
+    isAlive: true,
+  }];
+
+  // Add minions at higher prestige
+  if (prestigeLv >= 20) {
+    const minionHp = Math.round(bossHp * 0.2);
+    const minionAtk = Math.round(bossAtk * 0.5);
+    for (let i = 0; i < Math.min(2, Math.floor(prestigeLv / 20)); i++) {
+      enemies.push({
+        id: `enemy_${i + 1}`,
+        name: `시련의 종자 ${String.fromCharCode(65 + i)}`,
+        monsterId: 'prestige_trial_minion',
+        currentHp: minionHp,
+        maxHp: minionHp,
+        currentMp: 0,
+        maxMp: 0,
+        attack: minionAtk,
+        defense: Math.round(bossDef * 0.5),
+        speed: bossSpd,
+        statusEffects: [],
+        isAlive: true,
+      });
+    }
+  }
+
+  const skillStates: SkillState[] = SKILLS
+    .filter((s) => s.characterId === saveData.characterId || s.characterId === 'common')
+    .filter((s) => s.type !== 'passive')
+    .map((s) => ({ skillId: s.id, currentCooldown: 0, isAvailable: true }));
+
+  const player: BattleFighter = {
+    id: 'player',
+    name: saveData.playerName,
+    currentHp: totalStats.hp,
+    maxHp: totalStats.hp,
+    currentMp: totalStats.mp,
+    maxMp: totalStats.mp,
+    attack: totalStats.atk,
+    defense: totalStats.def,
+    speed: Math.round(totalStats.spd),
+    statusEffects: [],
+    isAlive: true,
+  };
+
+  const battleState: BattleState = {
+    id: `trial_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    status: 'player_turn',
+    turn: 1,
+    player,
+    enemies,
+    actionQueue: [],
+    log: [{ turn: 0, message: `시련의 수호자가 나타났습니다! (환생 Lv.${prestigeLv + 1} 시련)`, type: 'system' }],
+    stats: { totalDamageDealt: 0, totalDamageTaken: 0, highestCrit: 0, turnsElapsed: 0, skillsUsed: 0 },
+  };
+
+  // Store battle state in maps
+  const equippedIds = Object.values(saveData.equippedItems).filter(Boolean) as string[];
+  const { statMods, actives: setActives } = calculateSetBonuses(equippedIds);
+  const talentMods = calculatePassiveTreeBonuses(saveData.passiveTree?.allocatedNodes ?? []);
+  const randOpts = calculateRandomOptionBonuses(saveData);
+
+  battleStore.set(battleState.id, battleState);
+  skillStateStore.set(battleState.id, skillStates);
+  battleDungeonMap.set(battleState.id, '__prestige_trial__');
+  battleCritMap.set(battleState.id, { critRate: totalStats.crit, critDamage: totalStats.critDmg });
+  battleSetActiveMap.set(battleState.id, setActives);
+  battlePrestigeMap.set(battleState.id, saveData.prestigeLevel ?? 0);
+  battleArtifactMap.set(battleState.id, getArtifactBonuses(saveData.artifacts));
+  battleSkillLevelMap.set(battleState.id, { ...(saveData.skillLevels ?? {}) });
+  battleTalentMap.set(battleState.id, talentMods);
+  battleTitleMap.set(battleState.id, saveData.equippedTitle ?? '');
+  battleRandomOptionMap.set(battleState.id, {
+    goldPercent: randOpts.goldPercent, expPercent: randOpts.expPercent,
+    lifesteal: randOpts.lifesteal, reflect: randOpts.reflect, hpRegen: randOpts.hpRegen,
+  });
+  battlePetMap.set(battleState.id, (() => {
+    if (!saveData.activePet) return undefined as any;
+    const pet = PETS.find(p => p.id === saveData.activePet);
+    if (!pet) return undefined as any;
+    return { name: pet.name, attack: pet.attack, level: saveData.petLevels?.[saveData.activePet] ?? 0 };
+  })());
+  battleEquippedMap.set(battleState.id, equippedIds);
+  battleProcState.set(battleState.id, { cooldowns: {}, activeBuffs: [] });
+  battleKeystoneMap.set(battleState.id, totalStats.keystoneEffects.map(k => ({ id: k.id, ratio: k.ratio })));
+  battleUndyingUsed.set(battleState.id, false);
+
+  return { battleState, skillStates };
+}
