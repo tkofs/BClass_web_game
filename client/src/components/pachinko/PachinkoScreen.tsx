@@ -60,9 +60,9 @@ function saveStats(s: PachinkoStats) {
 }
 
 /* ── Constants ── */
-const COST_1 = 10_000;
-const COST_10 = 90_000;
-const COST_100 = 800_000;
+const COST_1 = 100_000;
+const COST_10 = 900_000;
+const COST_100 = 8_000_000;
 
 /* ── Canvas / Physics Constants ── */
 const CANVAS_W = 500;
@@ -167,7 +167,7 @@ function PachinkoScreen() {
   const saveData = useAuthStore((s) => s.saveData);
   const updateSaveData = useAuthStore((s) => s.updateSaveData);
 
-  const [position, setPosition] = useState<Position>('center');
+  const position: Position = 'center';
   const [playing, setPlaying] = useState(false);
   const [singleResult, setSingleResult] = useState<PlayResult | null>(null);
   const [multiSummary, setMultiSummary] = useState<MultiSummary | null>(null);
@@ -181,6 +181,7 @@ function PachinkoScreen() {
   const animFrameRef = useRef<number>(0);
   const playingRef = useRef(false);
   const pocketFlashRef = useRef<number[]>(new Array(SLOT_COUNT).fill(0));
+  const pocketPopupRef = useRef<({ label: string; color: string; life: number; offsetY: number } | null)[]>(new Array(SLOT_COUNT).fill(null));
   const onAllSettledRef = useRef<(() => void) | null>(null);
   const jackpotFlashRef = useRef(0);
 
@@ -339,8 +340,17 @@ function PachinkoScreen() {
           ball.x = getPocketCenterX(visualSlot);
           ball.y = POCKET_BOTTOM_Y - ball.radius - 5;
 
-          // Flash the visual pocket
+          // Flash the visual pocket + show reward popup
+          const cfg = SLOT_CONFIG[rewardSlot];
           pocketFlashRef.current[visualSlot] = 1.0;
+          if (cfg) {
+            pocketPopupRef.current[visualSlot] = {
+              label: cfg.label,
+              color: cfg.color,
+              life: 60, // ~1 second
+              offsetY: 0,
+            };
+          }
 
           // Jackpot flash (check server result)
           if (rewardSlot === 8) {
@@ -349,7 +359,6 @@ function PachinkoScreen() {
           }
 
           // Update running tally using server result
-          const cfg = SLOT_CONFIG[rewardSlot];
           if (cfg) {
             setRunningTally(prev => ({
               ...prev,
@@ -449,35 +458,40 @@ function PachinkoScreen() {
     ctx.fillStyle = 'rgba(10, 10, 30, 0.5)';
     ctx.fillRect(0, POCKET_TOP_Y, w, DIVIDER_H + 50);
 
-    // Pocket fills and flashes
+    // Pocket fills (neutral dark) and flashes
     for (let i = 0; i < SLOT_COUNT; i++) {
       const px = i * POCKET_W;
-      const cfg = SLOT_CONFIG[i];
       const flash = pocketFlashRef.current[i];
+      const popupInfo = pocketPopupRef.current[i];
 
-      // Base color fill
-      ctx.fillStyle = cfg.color + '15';
+      // Base neutral fill
+      ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(px, POCKET_TOP_Y, POCKET_W, DIVIDER_H);
 
-      // Flash overlay
-      if (flash > 0) {
-        ctx.fillStyle = cfg.color + Math.floor(flash * 180).toString(16).padStart(2, '0');
+      // Flash overlay with reward color
+      if (flash > 0 && popupInfo) {
+        ctx.fillStyle = popupInfo.color + Math.floor(flash * 200).toString(16).padStart(2, '0');
         ctx.fillRect(px, POCKET_TOP_Y, POCKET_W, DIVIDER_H);
       }
 
-      // Color bar at bottom of pocket
-      ctx.fillStyle = cfg.color + '80';
-      ctx.fillRect(px + 3, POCKET_TOP_Y + DIVIDER_H - 8, POCKET_W - 6, 5);
-
-      // Label
-      ctx.fillStyle = flash > 0.3 ? '#FFFFFF' : cfg.color;
-      ctx.font = 'bold 9px sans-serif';
+      // Pocket number
+      ctx.fillStyle = '#4B5563';
+      ctx.font = '8px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.fillText(`${i + 1}`, px + POCKET_W / 2, POCKET_TOP_Y + DIVIDER_H - 6);
 
-      // Abbreviate labels that are too long
-      const shortLabel = cfg.label.length > 4 ? cfg.label.slice(0, 4) : cfg.label;
-      ctx.fillText(shortLabel, px + POCKET_W / 2, POCKET_TOP_Y + DIVIDER_H / 2);
+      // Reward popup text (shows after ball lands)
+      if (popupInfo && popupInfo.life > 0) {
+        const alpha = Math.min(1, popupInfo.life / 30);
+        ctx.fillStyle = popupInfo.color;
+        ctx.globalAlpha = alpha;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText(popupInfo.label, px + POCKET_W / 2, POCKET_TOP_Y + DIVIDER_H / 2 - popupInfo.offsetY);
+        ctx.globalAlpha = 1;
+        popupInfo.life -= 1;
+        popupInfo.offsetY += 0.3;
+      }
     }
 
     // Divider walls (metallic silver)
@@ -654,6 +668,7 @@ function PachinkoScreen() {
     ballsRef.current = [];
     sparksRef.current = [];
     pocketFlashRef.current = new Array(SLOT_COUNT).fill(0);
+    pocketPopupRef.current = new Array(SLOT_COUNT).fill(null);
     jackpotFlashRef.current = 0;
     setJackpotFlash(0);
 
@@ -786,31 +801,6 @@ function PachinkoScreen() {
         <div className="text-sm text-gray-400">
           <span className="text-yellow-400 font-bold">{gold.toLocaleString()}</span> G
         </div>
-      </div>
-
-      {/* Position Selector */}
-      <div className="flex gap-2 mb-4 justify-center">
-        {([
-          { pos: 'left' as Position, icon: '\u25C0', label: '좌측', sub: '강화석\u2191' },
-          { pos: 'center' as Position, icon: '\u25CF', label: '중앙', sub: '밸런스' },
-          { pos: 'right' as Position, icon: '\u25B6', label: '우측', sub: '골드/젬\u2191' },
-        ]).map(({ pos, icon, label, sub }) => (
-          <button
-            key={pos}
-            type="button"
-            disabled={playing}
-            onClick={() => setPosition(pos)}
-            className={`flex-1 max-w-[120px] py-2 px-3 rounded-lg border text-center transition-all ${
-              position === pos
-                ? 'border-yellow-500 bg-yellow-500/15 text-yellow-400 shadow-lg shadow-yellow-500/20'
-                : 'border-gray-700 bg-dungeon-panel text-gray-500 hover:border-gray-500'
-            } disabled:cursor-not-allowed`}
-          >
-            <div className="text-lg">{icon}</div>
-            <div className="text-xs font-bold">{label}</div>
-            <div className="text-[10px] text-gray-500">{sub}</div>
-          </button>
-        ))}
       </div>
 
       {/* Main content: canvas + side panel */}

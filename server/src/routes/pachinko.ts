@@ -7,9 +7,9 @@ const router = Router();
 
 // ── Cost table ──
 const COST_MAP: Record<number, number> = {
-  1: 10_000,
-  10: 90_000,   // 10% discount
-  100: 800_000, // 20% discount
+  1: 100_000,
+  10: 900_000,   // 10% discount
+  100: 8_000_000, // 20% discount
 };
 
 // ── Reward table (base probabilities for 'center') ──
