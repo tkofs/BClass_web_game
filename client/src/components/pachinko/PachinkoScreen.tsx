@@ -22,6 +22,8 @@ const SLOT_CONFIG = [
 type Position = 'left' | 'center' | 'right';
 
 interface PlayResult {
+  id: string;
+  name: string;
   slot: number;
   reward: {
     type: string;
@@ -293,8 +295,8 @@ function PachinkoScreen() {
           ...prev,
           totalPlays: prev.totalPlays + count,
           totalSpent: prev.totalSpent + cost,
-          totalGoldWon: prev.totalGoldWon + (res.data.totalGold ?? 0),
-          totalGemsWon: prev.totalGemsWon + (res.data.totalGems ?? 0),
+          totalGoldWon: prev.totalGoldWon + (res.data.totalRewards?.gold ?? 0),
+          totalGemsWon: prev.totalGemsWon + (res.data.totalRewards?.gems ?? 0),
         };
         saveStats(next);
         return next;

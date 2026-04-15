@@ -129,14 +129,29 @@ router.post('/play', (req: Request, res: Response): void => {
     const table = getModifiedTable(position as Position);
 
     // Roll results and accumulate rewards
-    const results: { id: string; name: string }[] = [];
+    const results: { id: string; name: string; slot: number; reward: { type: string; label: string; amount: number; unit: string } }[] = [];
     let totalGold = 0;
     let totalGems = 0;
     const itemAccumulator: Record<string, number> = {};
 
+    // Map reward IDs to slot indices
+    const SLOT_MAP: Record<string, number> = {
+      miss: 0, gold_s: 1, gold_m: 2, gold_l: 3,
+      stone_common: 4, stone_rare: 5, stone_epic: 6, gems: 7, jackpot: 8,
+    };
+
     for (let i = 0; i < count; i++) {
       const entry = rollReward(table);
-      results.push({ id: entry.id, name: entry.name });
+      const slot = SLOT_MAP[entry.id] ?? 0;
+      // Build reward label
+      let label = '꽝', amount = 0, unit = '', type = 'miss';
+      if (entry.reward) {
+        if (entry.reward.gold) { label = entry.name; amount = entry.reward.gold; unit = 'G'; type = 'gold'; }
+        else if (entry.reward.gems && entry.reward.itemId) { label = entry.name; amount = entry.reward.gems; unit = '젬+강화석'; type = 'jackpot'; }
+        else if (entry.reward.gems) { label = entry.name; amount = entry.reward.gems; unit = '젬'; type = 'gems'; }
+        else if (entry.reward.itemId) { label = entry.name; amount = entry.reward.quantity ?? 1; unit = '개'; type = 'item'; }
+      }
+      results.push({ id: entry.id, name: entry.name, slot, reward: { type, label, amount, unit } });
 
       if (entry.reward) {
         if (entry.reward.gold) totalGold += entry.reward.gold;
