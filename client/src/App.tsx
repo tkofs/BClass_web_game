@@ -13,10 +13,10 @@ import ShopScreen from './components/shop/ShopScreen';
 import AchievementScreen from './components/achievement/AchievementScreen';
 import SkillScreen from './components/skills/SkillScreen';
 import PetScreen from './components/pets/PetScreen';
-import TalentScreen from './components/talents/TalentScreen';
 import RankingScreen from './components/ranking/RankingScreen';
 import ArtifactScreen from './components/artifacts/ArtifactScreen';
 import GachaScreen from './components/gacha/GachaScreen';
+import PassiveTreeScreen from './components/passive/PassiveTreeScreen';
 
 function App() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
@@ -41,10 +41,11 @@ function App() {
       <Route path="/achievements" element={<AchievementScreen />} />
       <Route path="/skills" element={<SkillScreen />} />
       <Route path="/pets" element={<PetScreen />} />
-      <Route path="/talents" element={<TalentScreen />} />
+      <Route path="/talents" element={<Navigate to="/passive" replace />} />
       <Route path="/ranking" element={<RankingScreen />} />
       <Route path="/artifacts" element={<ArtifactScreen />} />
       <Route path="/gacha" element={<GachaScreen />} />
+      <Route path="/passive" element={<PassiveTreeScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </>

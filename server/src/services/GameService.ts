@@ -28,15 +28,26 @@ export interface LevelUpResult {
 export function gainExp(saveData: SaveData, amount: number): LevelUpResult {
   if (amount <= 0) return { levelsGained: 0, newLevel: saveData.level, totalExp: saveData.exp };
 
+  const maxLevel = 300 + (saveData.prestigeLevel ?? 0);
+  if (saveData.level >= maxLevel) {
+    saveData.exp = 0;
+    return { levelsGained: 0, newLevel: saveData.level, totalExp: 0 };
+  }
+
   let levelsGained = 0;
   saveData.exp += amount;
 
   let threshold = expToNextLevel(saveData.level);
-  while (saveData.exp >= threshold) {
+  while (saveData.exp >= threshold && saveData.level < maxLevel) {
     saveData.exp -= threshold;
     saveData.level += 1;
     levelsGained += 1;
     threshold = expToNextLevel(saveData.level);
+  }
+
+  // Cap at max level
+  if (saveData.level >= maxLevel) {
+    saveData.exp = 0;
   }
 
   return {

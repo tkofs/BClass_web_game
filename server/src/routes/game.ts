@@ -85,28 +85,62 @@ router.post(
 
       if (!saveData.skillLevels) saveData.skillLevels = {};
       const currentLevel = saveData.skillLevels[skillId] ?? 0;
-      const maxLevel = 100;
+      const maxLevel = saveData.level;
+      const amount = Math.min(
+        Math.max(1, Math.floor(Number(req.body.amount) || 1)),
+        maxLevel - currentLevel,
+      );
 
-      if (currentLevel >= maxLevel) {
+      if (amount <= 0) {
         res.status(400).json({ success: false, message: '이미 최대 레벨입니다' });
         return;
       }
 
-      const cost = 1000 * Math.pow(currentLevel + 1, 2);
-      if (saveData.gold < cost) {
-        res.status(400).json({ success: false, message: `골드가 부족합니다 (필요: ${cost})` });
+      // Cost per level: 100 + level × 10 (linear scaling)
+      let totalCost = 0;
+      for (let i = 0; i < amount; i++) {
+        totalCost += 100 + (currentLevel + i) * 10;
+      }
+
+      if (saveData.gold < totalCost) {
+        // Calculate how many we CAN afford
+        let affordable = 0;
+        let partialCost = 0;
+        for (let i = 0; i < amount; i++) {
+          const c = 100 + (currentLevel + i) * 10;
+          if (partialCost + c > saveData.gold) break;
+          partialCost += c;
+          affordable++;
+        }
+        if (affordable === 0) {
+          res.status(400).json({ success: false, message: `골드가 부족합니다 (필요: ${(100 + currentLevel * 10).toLocaleString()})` });
+          return;
+        }
+        // Apply what we can afford
+        saveData.gold -= partialCost;
+        saveData.skillLevels[skillId] = currentLevel + affordable;
+        AuthService.saveProgress(saveCode, saveData);
+        res.json({
+          success: true,
+          skillId,
+          newLevel: saveData.skillLevels[skillId],
+          goldSpent: partialCost,
+          levelsGained: affordable,
+          saveData,
+        });
         return;
       }
 
-      saveData.gold -= cost;
-      saveData.skillLevels[skillId] = currentLevel + 1;
+      saveData.gold -= totalCost;
+      saveData.skillLevels[skillId] = currentLevel + amount;
       AuthService.saveProgress(saveCode, saveData);
 
       res.json({
         success: true,
         skillId,
         newLevel: saveData.skillLevels[skillId],
-        goldSpent: cost,
+        goldSpent: totalCost,
+        levelsGained: amount,
         saveData,
       });
     } catch (err) {
@@ -172,7 +206,9 @@ router.post('/prestige', (req: Request, res: Response): void => {
     saveData.level = keptLevel;
     saveData.exp = 0;
     saveData.skillLevels = {};
-    // Preserve premium talent investments during prestige
+    // Reset passive tree on prestige
+    saveData.passiveTree = { allocatedNodes: [] };
+    // Legacy talent reset (keep premium for backwards compat)
     const premTalentIds = new Set(TALENTS.filter((t: TalentNode) => t.premium).map((t: TalentNode) => t.id));
     const keptPremiumTalents: Record<string, number> = {};
     for (const [id, level] of Object.entries(saveData.talentPoints ?? {})) {

@@ -26,12 +26,13 @@ function SkillScreen() {
   }, [saveData?.characterId]);
 
   const handleUpgrade = useCallback(
-    async (skillId: string) => {
+    async (skillId: string, amount: number) => {
       setUpgrading(skillId);
       try {
-        const res = await axios.post('/api/game/skill-upgrade', { skillId });
+        const res = await axios.post('/api/game/skill-upgrade', { skillId, amount });
         if (res.data.success && res.data.saveData) {
           updateSaveData(res.data.saveData);
+          toast.success(`${res.data.levelsGained ?? 1}레벨 강화! (${res.data.goldSpent?.toLocaleString()}G)`);
         }
       } catch (err: any) {
         toast.error(err.response?.data?.message || '스킬 강화에 실패했습니다.');
@@ -63,10 +64,11 @@ function SkillScreen() {
       <div className="space-y-3">
         {characterSkills.map((skill) => {
           const level = saveData.skillLevels?.[skill.id] ?? 0;
-          const isMaxLevel = level >= 20;
+          const maxLevel = saveData.level;
+          const isMaxLevel = level >= maxLevel;
           const isPassive = skill.type === 'passive';
-          const upgradeCost = 1000 * Math.pow(level + 1, 2);
-          const canAfford = gold >= upgradeCost;
+          const nextCost = 100 + level * 10;
+          const canAfford = gold >= nextCost;
           const levelBonus = level * 0.05;
           const effectiveMultiplier = skill.damageMultiplier > 0
             ? skill.damageMultiplier + skill.damageMultiplier * levelBonus
@@ -142,25 +144,32 @@ function SkillScreen() {
                   )}
                 </div>
 
-                {/* Upgrade button */}
+                {/* Upgrade buttons */}
                 {!isPassive && (
-                  <div className="flex-shrink-0 text-center">
+                  <div className="flex-shrink-0 text-center space-y-1">
                     {isMaxLevel ? (
                       <div className="text-xs text-yellow-400 font-bold py-2 px-3">MAX</div>
                     ) : (
-                      <div>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={!canAfford || upgrading === skill.id}
-                          onClick={() => handleUpgrade(skill.id)}
-                        >
-                          {upgrading === skill.id ? '...' : '강화'}
-                        </Button>
-                        <p className={`text-[10px] mt-1 ${canAfford ? 'text-yellow-400' : 'text-red-400'}`}>
-                          {upgradeCost.toLocaleString()}G
+                      <>
+                        <div className="flex gap-1">
+                          {[1, 10, 100].map((amt) => (
+                            <Button
+                              key={amt}
+                              variant={amt === 1 ? 'primary' : 'secondary'}
+                              size="sm"
+                              disabled={!canAfford || upgrading === skill.id}
+                              onClick={() => handleUpgrade(skill.id, amt)}
+                              className="!px-2 !py-1 !text-[10px]"
+                            >
+                              {upgrading === skill.id ? '...' : `+${amt}`}
+                            </Button>
+                          ))}
+                        </div>
+                        <p className={`text-[10px] ${canAfford ? 'text-yellow-400' : 'text-red-400'}`}>
+                          다음: {nextCost.toLocaleString()}G
                         </p>
-                      </div>
+                        <p className="text-[9px] text-gray-500">{level} / {maxLevel}</p>
+                      </>
                     )}
                   </div>
                 )}

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameStore } from '@/stores/gameStore';
-import { CHARACTERS, ITEMS, TITLES, SETS, GEMS, PETS, ARTIFACTS } from '@shared/data';
+import { CHARACTERS, ITEMS, TITLES } from '@shared/data';
+import { calculateTotalStats } from '@shared/utils/calcStats';
 import Card from '@/components/common/Card';
 import StatBar from '@/components/common/StatBar';
 import axios from 'axios';
@@ -125,139 +126,8 @@ function HomeScreen() {
     };
   }, [character, saveData]);
 
-  // Total combat stats (matching server calculation)
-  const totalStats = useMemo(() => {
-    if (!baseStats || !saveData) return null;
-    let hp = baseStats.hp + equipStats.hp;
-    let mp = baseStats.mp + equipStats.mp;
-    let atk = baseStats.attack + equipStats.attack;
-    let def = baseStats.defense + equipStats.defense;
-    let spd = baseStats.speed + equipStats.speed;
-    let crit = baseStats.critRate + equipStats.critRate;
-    let critDmg = baseStats.critDamage + equipStats.critDamage;
-
-    // Socketed gems
-    const equippedIds = Object.values(saveData.equippedItems).filter(Boolean) as string[];
-    for (const id of equippedIds) {
-      for (const gemId of (saveData.socketedGems?.[id] ?? [])) {
-        const gem = GEMS.find((g) => g.id === gemId);
-        if (!gem) continue;
-        if (gem.stat === 'attack') atk += gem.value;
-        else if (gem.stat === 'defense') def += gem.value;
-        else if (gem.stat === 'hp') hp += gem.value;
-        else if (gem.stat === 'mp') mp += gem.value;
-        else if (gem.stat === 'speed') spd += gem.value;
-        else if (gem.stat === 'critRate') crit += gem.value;
-        else if (gem.stat === 'critDamage') critDmg += gem.value;
-      }
-    }
-
-    // Random option bonuses
-    let randOptAtkPct = 0, randOptHpPct = 0, randOptGoldPct = 0, randOptExpPct = 0;
-    let randLifesteal = 0, randReflect = 0, randHpRegen = 0;
-    for (const id of equippedIds) {
-      const opts = saveData.itemOptions?.[id] ?? [];
-      for (const opt of opts) {
-        if (opt.stat === 'atk_flat') atk += opt.value;
-        else if (opt.stat === 'atk_percent') randOptAtkPct += opt.value;
-        else if (opt.stat === 'def_flat') def += opt.value;
-        else if (opt.stat === 'hp_flat') hp += opt.value;
-        else if (opt.stat === 'hp_percent') randOptHpPct += opt.value;
-        else if (opt.stat === 'speed') spd += opt.value;
-        else if (opt.stat === 'crit_rate') crit += opt.value / 100;
-        else if (opt.stat === 'crit_damage') critDmg += opt.value / 100;
-        else if (opt.stat === 'gold_percent') randOptGoldPct += opt.value;
-        else if (opt.stat === 'exp_percent') randOptExpPct += opt.value;
-        else if (opt.stat === 'lifesteal') randLifesteal += opt.value;
-        else if (opt.stat === 'reflect') randReflect += opt.value;
-        else if (opt.stat === 'hp_regen') randHpRegen += opt.value;
-      }
-    }
-
-    // Set bonuses
-    for (const set of SETS) {
-      const count = set.pieces.filter((p) => equippedIds.includes(p)).length;
-      for (const b of set.bonuses) {
-        if (count >= b.requiredCount && b.stats) {
-          atk = Math.round(atk * (1 + (b.stats.atkPercent ?? 0) / 100));
-          def = Math.round(def * (1 + (b.stats.defPercent ?? 0) / 100));
-          hp = Math.round(hp * (1 + (b.stats.hpPercent ?? 0) / 100));
-          mp = Math.round(mp * (1 + (b.stats.mpPercent ?? 0) / 100));
-          crit += b.stats.critRateFlat ?? 0;
-          critDmg *= (1 + (b.stats.critDmgPercent ?? 0) / 100);
-        }
-      }
-    }
-
-    // Prestige
-    const pBonus = 1 + (saveData.prestigeLevel ?? 0) * 0.02;
-    hp = Math.round(hp * pBonus); mp = Math.round(mp * pBonus);
-    atk = Math.round(atk * pBonus); def = Math.round(def * pBonus);
-
-    // Talents
-    const tp = saveData.talentPoints ?? {};
-    atk = Math.round(atk * (1 + (tp['off_atk'] ?? 0) * 3 / 100));
-    def = Math.round(def * (1 + (tp['def_def'] ?? 0) * 3 / 100));
-    hp = Math.round(hp * (1 + (tp['def_hp'] ?? 0) * 5 / 100));
-    mp = Math.round(mp * (1 + (tp['util_mp'] ?? 0) * 5 / 100));
-    crit += (tp['off_crit'] ?? 0) * 0.01;
-    critDmg *= (1 + (tp['off_critdmg'] ?? 0) * 5 / 100);
-
-    // Title
-    if (saveData.equippedTitle) {
-      const title = TITLES.find((t) => t.id === saveData.equippedTitle);
-      if (title?.bonus) {
-        if (title.bonus.stat === 'atkPercent') atk = Math.round(atk * (1 + title.bonus.value / 100));
-        if (title.bonus.stat === 'defPercent') def = Math.round(def * (1 + title.bonus.value / 100));
-        if (title.bonus.stat === 'hpPercent') hp = Math.round(hp * (1 + title.bonus.value / 100));
-      }
-    }
-
-    // Pet
-    if (saveData.activePet) {
-      const pet = PETS.find((p) => p.id === saveData.activePet);
-      if (pet) {
-        for (const b of pet.bonus) {
-          if (b.stat === 'atkPercent') atk = Math.round(atk * (1 + b.value / 100));
-          if (b.stat === 'defPercent') def = Math.round(def * (1 + b.value / 100));
-          if (b.stat === 'hpPercent') hp = Math.round(hp * (1 + b.value / 100));
-          if (b.stat === 'mpPercent') mp = Math.round(mp * (1 + b.value / 100));
-          if (b.stat === 'critRateFlat') crit += b.value;
-        }
-      }
-    }
-
-    // Artifacts
-    for (const art of ARTIFACTS) {
-      const lv = (saveData.artifacts ?? {})[art.id] ?? 0;
-      if (lv <= 0) continue;
-      const val = art.effectPerLevel * lv;
-      if (art.effectType === 'hpPercent' || art.effectType === 'allPercent') hp = Math.round(hp * (1 + val / 100));
-      if (art.effectType === 'mpPercent' || art.effectType === 'allPercent') mp = Math.round(mp * (1 + val / 100));
-      if (art.effectType === 'atkPercent' || art.effectType === 'allPercent') atk = Math.round(atk * (1 + val / 100));
-      if (art.effectType === 'defPercent' || art.effectType === 'allPercent') def = Math.round(def * (1 + val / 100));
-    }
-
-    // Apply random option percent bonuses
-    if (randOptAtkPct > 0) atk = Math.round(atk * (1 + randOptAtkPct / 100));
-    if (randOptHpPct > 0) hp = Math.round(hp * (1 + randOptHpPct / 100));
-
-    // Calculate bonus percentages
-    const pLvl = saveData.prestigeLevel ?? 0;
-    let bonusExp = pLvl * 10 + randOptExpPct;
-    let bonusGold = pLvl * 5 + (tp['util_gold'] ?? 0) * 5 + randOptGoldPct;
-    let bonusDrop = pLvl * 1;
-    for (const art of ARTIFACTS) {
-      const lv2 = (saveData.artifacts ?? {})[art.id] ?? 0;
-      if (lv2 <= 0) continue;
-      const val2 = art.effectPerLevel * lv2;
-      if (art.effectType === 'expPercent') bonusExp += val2;
-      if (art.effectType === 'goldPercent') bonusGold += val2;
-      if (art.effectType === 'dropRatePercent') bonusDrop += val2;
-    }
-
-    return { hp, mp, atk, def, spd, crit, critDmg, bonusExp, bonusGold, bonusDrop, randLifesteal, randReflect, randHpRegen };
-  }, [baseStats, equipStats, saveData]);
+  // Total combat stats (shared calculation)
+  const totalStats = useMemo(() => saveData ? calculateTotalStats(saveData) : null, [saveData]);
 
   const expToNext = useMemo(() => (saveData?.level ?? 1) * 100, [saveData?.level]);
 
@@ -592,14 +462,28 @@ function HomeScreen() {
         </div>
 
         {/* Bonus percentages */}
-        {(totalStats.bonusExp > 0 || totalStats.bonusGold > 0 || totalStats.bonusDrop > 0 || totalStats.randLifesteal > 0 || totalStats.randReflect > 0 || totalStats.randHpRegen > 0) && (
+        {(totalStats.bonusExp > 0 || totalStats.bonusGold > 0 || totalStats.bonusDrop > 0 || totalStats.lifesteal > 0 || totalStats.reflect > 0 || totalStats.hpRegen > 0) && (
           <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-dungeon-border text-center text-[11px]">
             {totalStats.bonusExp > 0 && <div><span className="text-gray-500">경험치</span><br/><span className="text-green-400 font-bold">+{totalStats.bonusExp}%</span></div>}
             {totalStats.bonusGold > 0 && <div><span className="text-gray-500">골드</span><br/><span className="text-yellow-400 font-bold">+{totalStats.bonusGold}%</span></div>}
             {totalStats.bonusDrop > 0 && <div><span className="text-gray-500">드랍률</span><br/><span className="text-purple-400 font-bold">+{totalStats.bonusDrop}%</span></div>}
-            {totalStats.randLifesteal > 0 && <div><span className="text-gray-500">흡혈</span><br/><span className="text-red-400 font-bold">+{totalStats.randLifesteal.toFixed(1)}%</span></div>}
-            {totalStats.randReflect > 0 && <div><span className="text-gray-500">반사</span><br/><span className="text-blue-400 font-bold">+{totalStats.randReflect.toFixed(1)}%</span></div>}
-            {totalStats.randHpRegen > 0 && <div><span className="text-gray-500">턴HP회복</span><br/><span className="text-pink-400 font-bold">+{totalStats.randHpRegen.toFixed(1)}%</span></div>}
+            {totalStats.lifesteal > 0 && <div><span className="text-gray-500">흡혈</span><br/><span className="text-red-400 font-bold">+{totalStats.lifesteal.toFixed(1)}%</span></div>}
+            {totalStats.reflect > 0 && <div><span className="text-gray-500">반사</span><br/><span className="text-blue-400 font-bold">+{totalStats.reflect.toFixed(1)}%</span></div>}
+            {totalStats.hpRegen > 0 && <div><span className="text-gray-500">턴HP회복</span><br/><span className="text-pink-400 font-bold">+{totalStats.hpRegen.toFixed(1)}%</span></div>}
+          </div>
+        )}
+
+        {/* Passive tree special effects */}
+        {totalStats.passiveSpecials && totalStats.passiveSpecials.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-dungeon-border">
+            <p className="text-[10px] text-yellow-500 font-bold mb-1">특수 효과</p>
+            <div className="flex flex-wrap gap-1">
+              {totalStats.passiveSpecials.map((sp: string, i: number) => (
+                <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-yellow-900/20 text-yellow-300/80 border border-yellow-800/30" title={sp}>
+                  {sp.split(':')[0]}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -638,10 +522,10 @@ function HomeScreen() {
           <p className="text-lg font-bold">스킬</p>
           <p className="text-xs text-gray-500 mt-1">스킬을 강화하세요</p>
         </Card>
-        <Card hover onClick={() => navigate('/talents')} className="text-center py-6">
+        <Card hover onClick={() => navigate('/passive')} className="text-center py-6">
           <div className="text-3xl mb-2 text-purple-400">&#10038;</div>
-          <p className="text-lg font-bold">특성</p>
-          <p className="text-xs text-gray-500 mt-1">특성을 배분하세요</p>
+          <p className="text-lg font-bold">특성 트리</p>
+          <p className="text-xs text-gray-500 mt-1">패시브 트리를 배분하세요</p>
         </Card>
         <Card hover onClick={handlePets} className="text-center py-6">
           <div className="text-3xl mb-2 text-pink-400">&#128062;</div>

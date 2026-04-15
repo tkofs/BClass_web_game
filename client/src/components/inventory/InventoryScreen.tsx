@@ -5,7 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useInventory } from '@/hooks/useInventory';
 import type { ResolvedItem, EquippedSlotInfo } from '@/hooks/useInventory';
 import type { Item, ItemRarity, RandomOption } from '@shared/types';
-import { ITEMS, SETS, CHARACTERS, GEMS, TITLES, PETS, ARTIFACTS } from '@shared/data';
+import { GEMS } from '@shared/data';
+import { calculateTotalStats, getActiveSets } from '@shared/utils/calcStats';
 import axios from 'axios';
 import { toast, confirm } from '@/components/common/Toast';
 import Card from '@/components/common/Card';
@@ -1195,166 +1196,9 @@ function InventoryScreen() {
 
           {/* Total stats + Set bonuses */}
           {(() => {
-            const equippedIds = equippedSlots.map((s) => s.itemId).filter(Boolean) as string[];
-            const character = CHARACTERS.find((c) => c.id === saveData?.characterId);
-            if (!character || !saveData) return null;
-
-            // Base + equip stats
-            const levelBonus = saveData.level - 1;
-            let totalAtk = character.baseStats.attack + levelBonus * 3;
-            let totalDef = character.baseStats.defense + levelBonus * 2;
-            let totalHp = character.baseStats.maxHp + levelBonus * 15;
-            let totalMp = character.baseStats.maxMp + levelBonus * 5;
-            let totalSpd = character.baseStats.speed + levelBonus * 1;
-            let totalCrit = character.baseStats.critRate;
-            let totalCritDmg = character.baseStats.critDamage;
-
-            for (const id of equippedIds) {
-              const item = ITEMS.find((i) => i.id === id);
-              if (!item?.stats) continue;
-              const mult = 1 + (saveData.enhanceLevels?.[id]?.level ?? 0);
-              totalAtk += (item.stats.attack ?? 0) * mult;
-              totalDef += (item.stats.defense ?? 0) * mult;
-              totalHp += (item.stats.hp ?? 0) * mult;
-              totalMp += (item.stats.mp ?? 0) * mult;
-              totalSpd += (item.stats.speed ?? 0) * mult;
-              totalCrit += (item.stats.critRate ?? 0);
-              totalCritDmg += (item.stats.critDamage ?? 0);
-            }
-
-            // Add random option flat stats to totals
-            let randOptAtkPercent = 0, randOptHpPercent = 0;
-            let randOptGoldPct = 0, randOptExpPct = 0;
-            let randLifesteal = 0, randReflect = 0, randHpRegen = 0;
-            for (const id of equippedIds) {
-              const opts = saveData.itemOptions?.[id] ?? [];
-              for (const opt of opts) {
-                switch (opt.stat) {
-                  case 'atk_flat': totalAtk += opt.value; break;
-                  case 'atk_percent': randOptAtkPercent += opt.value; break;
-                  case 'def_flat': totalDef += opt.value; break;
-                  case 'hp_flat': totalHp += opt.value; break;
-                  case 'hp_percent': randOptHpPercent += opt.value; break;
-                  case 'speed': totalSpd += opt.value; break;
-                  case 'crit_rate': totalCrit += opt.value / 100; break;
-                  case 'crit_damage': totalCritDmg += opt.value / 100; break;
-                  case 'gold_percent': randOptGoldPct += opt.value; break;
-                  case 'exp_percent': randOptExpPct += opt.value; break;
-                  case 'lifesteal': randLifesteal += opt.value; break;
-                  case 'reflect': randReflect += opt.value; break;
-                  case 'hp_regen': randHpRegen += opt.value; break;
-                }
-              }
-            }
-
-            // Add socketed gem stats to totals
-            for (const id of equippedIds) {
-              const sockets = saveData.socketedGems?.[id] ?? [];
-              for (const gemId of sockets) {
-                const gem = GEMS.find((g) => g.id === gemId);
-                if (!gem) continue;
-                if (gem.stat === 'attack') totalAtk += gem.value;
-                else if (gem.stat === 'defense') totalDef += gem.value;
-                else if (gem.stat === 'hp') totalHp += gem.value;
-                else if (gem.stat === 'mp') totalMp += gem.value;
-                else if (gem.stat === 'speed') totalSpd += gem.value;
-                else if (gem.stat === 'critRate') totalCrit += gem.value;
-                else if (gem.stat === 'critDamage') totalCritDmg += gem.value;
-              }
-            }
-
-            // Set bonuses
-            const activeSets: { name: string; count: number; total: number; bonuses: { desc: string; active: boolean }[] }[] = [];
-            for (const set of SETS) {
-              const count = set.pieces.filter((p) => equippedIds.includes(p)).length;
-              if (count === 0) continue;
-              const bonuses = set.bonuses.map((b) => ({
-                desc: `(${b.requiredCount}세트) ${b.description}`,
-                active: count >= b.requiredCount,
-              }));
-              activeSets.push({ name: set.name, count, total: set.pieces.length, bonuses });
-
-              // Apply % to totals
-              for (const b of set.bonuses) {
-                if (count >= b.requiredCount && b.stats) {
-                  totalAtk = Math.round(totalAtk * (1 + (b.stats.atkPercent ?? 0) / 100));
-                  totalDef = Math.round(totalDef * (1 + (b.stats.defPercent ?? 0) / 100));
-                  totalHp = Math.round(totalHp * (1 + (b.stats.hpPercent ?? 0) / 100));
-                  totalMp = Math.round(totalMp * (1 + (b.stats.mpPercent ?? 0) / 100));
-                  totalCrit += b.stats.critRateFlat ?? 0;
-                  totalCritDmg *= (1 + (b.stats.critDmgPercent ?? 0) / 100);
-                }
-              }
-            }
-
-            // Prestige bonus
-            const prestigeBonus = 1 + (saveData.prestigeLevel ?? 0) * 0.02;
-            totalHp = Math.round(totalHp * prestigeBonus);
-            totalMp = Math.round(totalMp * prestigeBonus);
-            totalAtk = Math.round(totalAtk * prestigeBonus);
-            totalDef = Math.round(totalDef * prestigeBonus);
-
-            // Talent bonuses
-            const tp = saveData.talentPoints ?? {};
-            const talentAtkP = (tp['off_atk'] ?? 0) * 3;
-            const talentDefP = (tp['def_def'] ?? 0) * 3;
-            const talentHpP = (tp['def_hp'] ?? 0) * 5;
-            const talentMpP = (tp['util_mp'] ?? 0) * 5;
-            totalAtk = Math.round(totalAtk * (1 + talentAtkP / 100));
-            totalDef = Math.round(totalDef * (1 + talentDefP / 100));
-            totalHp = Math.round(totalHp * (1 + talentHpP / 100));
-            totalMp = Math.round(totalMp * (1 + talentMpP / 100));
-            totalCrit += (tp['off_crit'] ?? 0) * 0.01;
-            totalCritDmg *= (1 + (tp['off_critdmg'] ?? 0) * 5 / 100);
-
-            // Title bonus
-            const titleId = saveData.equippedTitle ?? '';
-            if (titleId) {
-              const title = TITLES.find((t) => t.id === titleId);
-              if (title?.bonus) {
-                if (title.bonus.stat === 'atkPercent') totalAtk = Math.round(totalAtk * (1 + title.bonus.value / 100));
-                if (title.bonus.stat === 'defPercent') totalDef = Math.round(totalDef * (1 + title.bonus.value / 100));
-                if (title.bonus.stat === 'hpPercent') totalHp = Math.round(totalHp * (1 + title.bonus.value / 100));
-              }
-            }
-
-            // Pet bonus
-            if (saveData.activePet) {
-              const pet = PETS.find((p) => p.id === saveData.activePet);
-              if (pet) {
-                for (const b of pet.bonus) {
-                  if (b.stat === 'atkPercent') totalAtk = Math.round(totalAtk * (1 + b.value / 100));
-                  if (b.stat === 'defPercent') totalDef = Math.round(totalDef * (1 + b.value / 100));
-                  if (b.stat === 'hpPercent') totalHp = Math.round(totalHp * (1 + b.value / 100));
-                  if (b.stat === 'mpPercent') totalMp = Math.round(totalMp * (1 + b.value / 100));
-                  if (b.stat === 'critRateFlat') totalCrit += b.value;
-                }
-              }
-            }
-
-            // Artifact bonus
-            const arts = saveData.artifacts ?? {};
-            let bonusGold = 0, bonusExp = 0, bonusDrop = 0;
-            for (const art of ARTIFACTS) {
-              const lv = arts[art.id] ?? 0;
-              if (lv <= 0) continue;
-              const val = art.effectPerLevel * lv;
-              if (art.effectType === 'hpPercent') totalHp = Math.round(totalHp * (1 + val / 100));
-              if (art.effectType === 'mpPercent') totalMp = Math.round(totalMp * (1 + val / 100));
-              if (art.effectType === 'atkPercent') totalAtk = Math.round(totalAtk * (1 + val / 100));
-              if (art.effectType === 'defPercent') totalDef = Math.round(totalDef * (1 + val / 100));
-              if (art.effectType === 'goldPercent') bonusGold += val;
-              if (art.effectType === 'expPercent') bonusExp += val;
-              if (art.effectType === 'dropRatePercent') bonusDrop += val;
-            }
-            // talent gold bonus
-            bonusGold += (tp['util_gold'] ?? 0) * 5;
-
-            // Random option percent bonuses
-            if (randOptAtkPercent > 0) totalAtk = Math.round(totalAtk * (1 + randOptAtkPercent / 100));
-            if (randOptHpPercent > 0) totalHp = Math.round(totalHp * (1 + randOptHpPercent / 100));
-            bonusGold += randOptGoldPct;
-            bonusExp += randOptExpPct;
+            if (!saveData) return null;
+            const stats = calculateTotalStats(saveData);
+            const activeSets = getActiveSets(saveData);
 
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1362,22 +1206,35 @@ function InventoryScreen() {
                 <Card className="p-4">
                   <h2 className="text-sm font-bold text-gray-400 mb-3">종합 전투력</h2>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex justify-between"><span className="text-gray-500">HP</span><span className="text-red-400 font-bold">{totalHp.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">MP</span><span className="text-blue-400 font-bold">{totalMp.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">공격력</span><span className="text-red-400 font-bold">{totalAtk.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">방어력</span><span className="text-blue-400 font-bold">{totalDef.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">속도</span><span className="text-green-400 font-bold">{totalSpd}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-500">치명타율</span><span className="text-yellow-400 font-bold">{Math.round(totalCrit * 100)}%</span></div>
-                    <div className="flex justify-between col-span-2"><span className="text-gray-500">치명타 피해</span><span className="text-purple-400 font-bold">x{totalCritDmg.toFixed(2)}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">HP</span><span className="text-red-400 font-bold">{stats.hp.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">MP</span><span className="text-blue-400 font-bold">{stats.mp.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">공격력</span><span className="text-red-400 font-bold">{stats.atk.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">방어력</span><span className="text-blue-400 font-bold">{stats.def.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">속도</span><span className="text-green-400 font-bold">{stats.spd}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">치명타율</span><span className="text-yellow-400 font-bold">{Math.round(stats.crit * 100)}%</span></div>
+                    <div className="flex justify-between col-span-2"><span className="text-gray-500">치명타 피해</span><span className="text-purple-400 font-bold">x{stats.critDmg.toFixed(2)}</span></div>
                   </div>
-                  {(bonusGold > 0 || bonusExp > 0 || bonusDrop > 0 || randLifesteal > 0 || randReflect > 0 || randHpRegen > 0) && (
+                  {(stats.bonusGold > 0 || stats.bonusExp > 0 || stats.bonusDrop > 0 || stats.lifesteal > 0 || stats.reflect > 0 || stats.hpRegen > 0) && (
                     <div className="mt-2 pt-2 border-t border-dungeon-border grid grid-cols-3 gap-1 text-[10px]">
-                      {bonusExp > 0 && <div className="text-center"><span className="text-gray-500">경험치</span><br/><span className="text-green-400">+{bonusExp}%</span></div>}
-                      {bonusGold > 0 && <div className="text-center"><span className="text-gray-500">골드</span><br/><span className="text-yellow-400">+{bonusGold}%</span></div>}
-                      {bonusDrop > 0 && <div className="text-center"><span className="text-gray-500">드랍률</span><br/><span className="text-purple-400">+{bonusDrop}%</span></div>}
-                      {randLifesteal > 0 && <div className="text-center"><span className="text-gray-500">흡혈</span><br/><span className="text-red-400">+{randLifesteal.toFixed(1)}%</span></div>}
-                      {randReflect > 0 && <div className="text-center"><span className="text-gray-500">반사</span><br/><span className="text-blue-400">+{randReflect.toFixed(1)}%</span></div>}
-                      {randHpRegen > 0 && <div className="text-center"><span className="text-gray-500">턴HP회복</span><br/><span className="text-pink-400">+{randHpRegen.toFixed(1)}%</span></div>}
+                      {stats.bonusExp > 0 && <div className="text-center"><span className="text-gray-500">경험치</span><br/><span className="text-green-400">+{stats.bonusExp}%</span></div>}
+                      {stats.bonusGold > 0 && <div className="text-center"><span className="text-gray-500">골드</span><br/><span className="text-yellow-400">+{stats.bonusGold}%</span></div>}
+                      {stats.bonusDrop > 0 && <div className="text-center"><span className="text-gray-500">드랍률</span><br/><span className="text-purple-400">+{stats.bonusDrop}%</span></div>}
+                      {stats.lifesteal > 0 && <div className="text-center"><span className="text-gray-500">흡혈</span><br/><span className="text-red-400">+{stats.lifesteal.toFixed(1)}%</span></div>}
+                      {stats.reflect > 0 && <div className="text-center"><span className="text-gray-500">반사</span><br/><span className="text-blue-400">+{stats.reflect.toFixed(1)}%</span></div>}
+                      {stats.hpRegen > 0 && <div className="text-center"><span className="text-gray-500">턴HP회복</span><br/><span className="text-pink-400">+{stats.hpRegen.toFixed(1)}%</span></div>}
+                    </div>
+                  )}
+                  {/* Passive tree special effects */}
+                  {stats.passiveSpecials.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-dungeon-border">
+                      <p className="text-[10px] text-yellow-500 font-bold mb-1">특수 효과</p>
+                      <div className="flex flex-wrap gap-1">
+                        {stats.passiveSpecials.map((sp, i) => (
+                          <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-900/20 text-yellow-300/80 border border-yellow-800/30" title={sp}>
+                            {sp.split(':')[0]}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </Card>

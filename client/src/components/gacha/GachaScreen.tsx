@@ -159,6 +159,9 @@ function GachaScreen() {
             : `${pityMax}회 소환 시 신화 펫 확정 (기본 확률 2%)`
           }
         </p>
+        {isEquipTab && (
+          <p className="text-[10px] text-yellow-500/70 mt-0.5">신화 장비 또는 강화석만 획득 가능</p>
+        )}
       </Card>
 
       {/* Pull buttons */}

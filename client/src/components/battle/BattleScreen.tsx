@@ -9,18 +9,33 @@ import { SKILLS, ITEMS } from '@shared/data';
 import SkillBar from './SkillBar';
 import BattleResult from './BattleResult';
 import AnimatedSprite from './AnimatedSprite';
+import BattleEffect from './BattleEffect';
+import type { EffectType } from './BattleEffect';
 import { CLASS_SPRITES, getMonsterSprite, getDungeonBackground } from '@/config/spriteMap';
+import { PETS } from '@shared/data';
+
+const PET_EMOJIS: Record<string, string> = {
+  pet_wolf: '\uD83D\uDC3A', pet_cat: '\uD83D\uDC31', pet_turtle: '\uD83D\uDC22',
+  pet_eagle: '\uD83E\uDD85', pet_phoenix: '\uD83D\uDD25', pet_dragon: '\uD83D\uDC09',
+  pet_unicorn: '\uD83E\uDD84', pet_demon: '\uD83D\uDC7F', pet_angel: '\uD83D\uDC7C',
+  pet_myth_dragon: '\uD83D\uDC32', pet_myth_void: '\uD83D\uDC7E', pet_myth_eagle: '\uD83E\uDD85',
+  pet_myth_unicorn: '\uD83E\uDD84', pet_myth_reaper: '\uD83D\uDC80',
+};
 import type { BattleFighter } from '@shared/types';
 
 const EnemyCard = React.memo(function EnemyCard({
   enemy,
   isSelected,
   isFlashing,
+  effectType,
+  isLunging,
   onSelect,
 }: {
   enemy: BattleFighter;
   isSelected: boolean;
   isFlashing: boolean;
+  effectType: EffectType | null;
+  isLunging: boolean;
   onSelect: (id: string) => void;
 }) {
   const handleClick = useCallback(() => {
@@ -43,41 +58,35 @@ const EnemyCard = React.memo(function EnemyCard({
             : 'duration-200 hover:drop-shadow-[0_0_6px_rgba(255,255,255,0.3)] cursor-pointer'
       }`}
     >
-      {/* Selection indicator */}
-      {isSelected && enemy.isAlive && (
-        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-      )}
-
-      {/* Sprite container */}
-      <div className={`relative ${isFlashing ? 'animate-shake' : ''} ${!enemy.isAlive ? 'grayscale rotate-90 translate-y-2' : ''}`}
-           style={{ transition: 'all 0.5s ease' }}>
+      {/* Sprite (facing left) */}
+      <div className={`relative ${isFlashing ? 'animate-shake' : ''} ${isLunging ? 'animate-lunge-left' : ''} ${!enemy.isAlive ? 'grayscale rotate-90 translate-y-2' : ''}`}
+           style={{ transition: enemy.isAlive ? 'none' : 'all 0.5s ease' }}>
+        {isSelected && enemy.isAlive && (
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500 animate-pulse z-30" />
+        )}
         <AnimatedSprite
-          frames={enemy.isAlive ? spriteSet.idle : spriteSet.idle.slice(0, 1)}
-          fps={enemy.isAlive ? 6 : 0}
-          width={isBoss ? 80 : 56}
-          height={isBoss ? 80 : 56}
+          frames={isLunging && enemy.isAlive ? spriteSet.run : (enemy.isAlive ? spriteSet.idle : spriteSet.idle.slice(0, 1))}
+          fps={isLunging ? 12 : (enemy.isAlive ? 6 : 0)}
+          width={isBoss ? 72 : 48}
+          height={isBoss ? 72 : 48}
+          flip={true}
           paused={!enemy.isAlive}
         />
-        {/* Hit flash overlay */}
-        {isFlashing && (
+        {effectType && <BattleEffect type={effectType} />}
+        {isFlashing && !effectType && (
           <div className="absolute inset-0 bg-red-500/40 rounded mix-blend-screen" />
         )}
       </div>
 
-      {/* Name */}
-      <p className="text-[10px] font-bold text-center truncate max-w-[80px] mt-1">{enemy.name}</p>
-
-      {/* HP bar */}
-      <div className="w-16 mt-0.5">
-        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+      {/* Name + HP below sprite */}
+      <p className="text-[9px] font-bold truncate max-w-[70px] leading-none mt-0.5">{enemy.name}</p>
+      <div className="w-14">
+        <div className="h-1 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
           <div
             className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-300"
             style={{ width: `${Math.max(0, (enemy.currentHp / enemy.maxHp) * 100)}%` }}
           />
         </div>
-        <p className="text-[8px] text-gray-500 text-center mt-0.5">
-          {enemy.currentHp.toLocaleString()}/{enemy.maxHp.toLocaleString()}
-        </p>
       </div>
     </button>
   );
@@ -113,9 +122,20 @@ function BattleScreen() {
   const isAbyssMode = dungeonId === 'abyss';
   const isWeeklyBossMode = dungeonId === 'weekly_boss';
 
+  const dungeonBg = getDungeonBackground(dungeonId ?? '');
+  const playerSprites = CLASS_SPRITES[saveData?.characterId ?? ''] ?? CLASS_SPRITES.dark_knight;
+  const activePetData = useMemo(() => {
+    if (!saveData?.activePet) return null;
+    return PETS.find((p) => p.id === saveData.activePet) ?? null;
+  }, [saveData?.activePet]);
+
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [flashEnemies, setFlashEnemies] = useState<Set<string>>(new Set());
-  const [healFlash, setHealFlash] = useState(false);
+  const [playerAttacking, setPlayerAttacking] = useState(false);
+  const [enemyEffects, setEnemyEffects] = useState<Record<string, EffectType>>({});
+  const [enemyLunging, setEnemyLunging] = useState<string | null>(null);
+  const [playerEffect, setPlayerEffect] = useState<EffectType | null>(null);
+  const [petAttacking, setPetAttacking] = useState(false);
   const [skillText, setSkillText] = useState<string | null>(null);
   const [autoBattle, setAutoBattle] = useState(false);
   const [battleSpeed, setBattleSpeed] = useState(1);
@@ -150,6 +170,18 @@ function BattleScreen() {
     }
   }, [dungeonId, isAbyssMode, isWeeklyBossMode, isAuthenticated, navigate, resetBattle, startBattle, startAbyssBattle, startWeeklyBossBattle]);
 
+  // Clear stale effects when enemies change (new wave)
+  const prevEnemyIds = useRef('');
+  useEffect(() => {
+    const currentIds = battleState?.enemies.map(e => e.id).join(',') ?? '';
+    if (prevEnemyIds.current && currentIds !== prevEnemyIds.current) {
+      setFlashEnemies(new Set());
+      setEnemyEffects({});
+      setEnemyLunging(null);
+    }
+    prevEnemyIds.current = currentIds;
+  }, [battleState?.enemies]);
+
   // Boss entrance overlay
   useEffect(() => {
     if (battleState && battleState.enemies.length === 1 && battleState.turn === 1) {
@@ -181,7 +213,6 @@ function BattleScreen() {
 
   const handleSkillSelect = useCallback(
     async (skillId: string) => {
-      // 항상 스토어에서 최신 상태를 가져옴 (클로저 문제 방지)
       const state = useCombatStore.getState();
       const currentBattle = state.battleState;
       if (!currentBattle || currentBattle.status !== 'player_turn') return;
@@ -201,6 +232,45 @@ function BattleScreen() {
         if (targetId !== selectedTargetId) setSelectedTargetId(targetId);
       }
 
+      const animType = (skill.animation ?? 'slash') as EffectType;
+      const isAttack = skill.targetType !== 'self' && skill.targetType !== 'all_allies';
+      const effectDelay = isAttack ? 250 / battleSpeed : 0;
+      const totalAnimTime = isAttack ? 600 / battleSpeed : 300 / battleSpeed;
+
+      // ── 1단계: 공격 모션 + 이펙트 먼저 표시 (서버 호출 전) ──
+      setSkillText(skill.name);
+      setTimeout(() => setSkillText(null), 800 / battleSpeed);
+
+      if (isAttack) {
+        // 플레이어 돌진
+        setPlayerAttacking(true);
+        setTimeout(() => setPlayerAttacking(false), 500 / battleSpeed);
+
+        // 타겟에 이펙트 표시
+        setTimeout(() => {
+          const hitIds = new Set<string>();
+          if (skill.targetType === 'all_enemies') {
+            currentBattle.enemies.filter(e => e.isAlive).forEach((e) => hitIds.add(e.id));
+          } else {
+            hitIds.add(targetId);
+          }
+          const effects: Record<string, EffectType> = {};
+          hitIds.forEach((id) => { effects[id] = animType; });
+          setEnemyEffects(effects);
+          setFlashEnemies(hitIds);
+          setTimeout(() => {
+            setEnemyEffects({});
+            setFlashEnemies(new Set());
+          }, 400 / battleSpeed);
+        }, effectDelay);
+      } else if (skill.targetType === 'self' || skill.targetType === 'all_allies') {
+        setPlayerEffect(skill.animation === 'heal' ? 'heal' : 'buff');
+        setTimeout(() => setPlayerEffect(null), 500 / battleSpeed);
+      }
+
+      // ── 2단계: 이펙트 보여준 후 서버 호출 ──
+      await new Promise(r => setTimeout(r, totalAnimTime));
+
       const prevLogLen = useCombatStore.getState().battleLog.length;
 
       const result = isAbyssMode
@@ -213,35 +283,16 @@ function BattleScreen() {
         updateSaveData(result.saveData);
       }
 
-      // Show skill name floating text
-      setSkillText(skill.name);
-      setTimeout(() => setSkillText(null), 800 / battleSpeed);
-
-      // Check new log entries for damage/heal
+      // ── 3단계: 펫 공격 애니메이션 ──
       const newLog = useCombatStore.getState().battleLog;
       const newEntries = newLog.slice(prevLogLen);
-
-      const hasDamage = newEntries.some((e) => e.type === 'damage');
-      const hasHeal = newEntries.some((e) => e.type === 'heal');
-
-      if (hasDamage) {
-        // Flash all enemies that were targeted
-        const hitIds = new Set<string>();
-        if (skill.targetType === 'all_enemies' && result?.battleState) {
-          result.battleState.enemies.forEach((e) => hitIds.add(e.id));
-        } else if (targetId !== 'player') {
-          hitIds.add(targetId);
-        }
-        setFlashEnemies(hitIds);
-        setTimeout(() => setFlashEnemies(new Set()), 300 / battleSpeed);
-      }
-
-      if (hasHeal) {
-        setHealFlash(true);
-        setTimeout(() => setHealFlash(false), 300 / battleSpeed);
+      const hasPetAttack = newEntries.some((e) => e.message.startsWith('[펫]'));
+      if (hasPetAttack && activePetData) {
+        setPetAttacking(true);
+        setTimeout(() => setPetAttacking(false), 400 / battleSpeed);
       }
     },
-    [selectedTargetId, useSkill, useAbyssSkill, useWeeklyBossSkill, isAbyssMode, isWeeklyBossMode, updateSaveData, battleSpeed],
+    [selectedTargetId, useSkill, useAbyssSkill, useWeeklyBossSkill, isAbyssMode, isWeeklyBossMode, updateSaveData, battleSpeed, activePetData],
   );
 
   const handleContinue = useCallback(() => {
@@ -380,14 +431,26 @@ function BattleScreen() {
 
   const [playerHit, setPlayerHit] = useState(false);
   const prevPlayerHp = useRef(0);
-  const dungeonBg = getDungeonBackground(dungeonId ?? '');
-  const playerSprites = CLASS_SPRITES[saveData?.characterId ?? ''] ?? CLASS_SPRITES.dark_knight;
 
-  // Detect when player takes damage for hit animation
+  // Detect when player takes damage -> enemy lunge + player hit animation
   useEffect(() => {
     if (battleState && battleState.player.currentHp < prevPlayerHp.current) {
-      setPlayerHit(true);
-      setTimeout(() => setPlayerHit(false), 300);
+      // Find a random alive enemy to show as attacker
+      const aliveEnemies = battleState.enemies.filter((e) => e.isAlive);
+      const attacker = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
+      if (attacker) {
+        setEnemyLunging(attacker.id);
+        setTimeout(() => setEnemyLunging(null), 400);
+      }
+      // Player hit + effect
+      setTimeout(() => {
+        setPlayerHit(true);
+        setPlayerEffect('enemy_attack');
+        setTimeout(() => {
+          setPlayerHit(false);
+          setPlayerEffect(null);
+        }, 300);
+      }, 150);
     }
     prevPlayerHp.current = battleState?.player.currentHp ?? 0;
   }, [battleState?.player.currentHp]);
@@ -458,91 +521,137 @@ function BattleScreen() {
         </div>
       )}
 
-      {/* ═══ Battle Field ═══ */}
+      {/* ═══ Battle Field (좌: 플레이어+펫 / 우: 적) ═══ */}
       <div
-        className="relative flex-shrink-0 flex flex-col items-center justify-between py-4 px-2"
+        className="relative flex-shrink-0 flex items-center justify-between px-6 sm:px-10"
         style={{
           background: dungeonBg.gradient,
-          minHeight: '260px',
+          height: '480px',
           borderBottom: '2px solid rgba(255,255,255,0.05)',
         }}
       >
-        {/* Floor tiles overlay */}
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/40 to-transparent" />
+        {/* Floor */}
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/60 to-transparent" />
 
-        {/* Enemy sprites area */}
-        <div className="flex gap-4 sm:gap-6 justify-center flex-wrap z-10">
+        {/* Left side: Player + Pet */}
+        <div className="flex flex-col items-center gap-1 z-10">
+          <div className={`relative ${playerHit ? 'animate-shake' : ''} ${playerAttacking ? 'animate-lunge-right' : ''}`}>
+            <AnimatedSprite
+              frames={playerAttacking ? playerSprites.run : (playerHit ? playerSprites.hit : playerSprites.idle)}
+              fps={playerAttacking ? 12 : (playerHit ? 12 : 6)}
+              width={88}
+              height={88}
+            />
+            {playerEffect && <BattleEffect type={playerEffect} />}
+          </div>
+          <span className="text-[11px] font-bold">{battleState.player.name}</span>
+
+          {activePetData && (
+            <div className={`flex flex-col items-center ${petAttacking ? 'animate-lunge-right' : ''}`}>
+              <span className={`text-3xl ${petAttacking ? 'animate-bounce' : ''}`}>
+                {PET_EMOJIS[activePetData.id] ?? '\uD83D\uDC3E'}
+              </span>
+              <span className="text-[8px] text-yellow-400">{activePetData.name}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Right side: Enemies (세로 배치, 5마리 고정 영역) */}
+        <div className="flex flex-col gap-1 items-center z-10 justify-center h-full">
           {battleState.enemies.map((enemy) => (
             <EnemyCard
               key={enemy.id}
               enemy={enemy}
               isSelected={selectedTargetId === enemy.id}
               isFlashing={flashEnemies.has(enemy.id)}
+              effectType={enemyEffects[enemy.id] ?? null}
+              isLunging={enemyLunging === enemy.id}
               onSelect={handleTargetSelect}
             />
           ))}
         </div>
+      </div>
 
-        {/* VS divider */}
-        <div className="text-gray-600 text-xs font-bold tracking-widest my-2">VS</div>
-
-        {/* Player sprite area */}
-        <div className="flex items-end gap-4 z-10">
-          <div className={`relative ${playerHit ? 'animate-shake' : ''}`}>
-            <AnimatedSprite
-              frames={playerHit ? playerSprites.hit : playerSprites.idle}
-              fps={playerHit ? 12 : 6}
-              width={72}
-              height={72}
-              flip={true}
-            />
-            {healFlash && (
-              <div className="absolute inset-0 bg-green-400/30 rounded mix-blend-screen animate-pulse" />
-            )}
-          </div>
-          {/* Player info next to sprite */}
-          <div className="flex flex-col gap-1 pb-1">
+      {/* ═══ Player Status Panel (RPG UI 스타일) ═══ */}
+      <div className="bg-gradient-to-b from-gray-900/95 to-black/95 border-y border-gray-700/50 px-3 py-2.5">
+        <div className="max-w-xl mx-auto flex items-center gap-4">
+          {/* HP/MP bars */}
+          <div className="flex-1 space-y-1.5">
+            {/* HP */}
             <div className="flex items-center gap-2">
-              <span className="font-bold text-sm">{battleState.player.name}</span>
-              {battleState.player.statusEffects.map((eff, i) => (
-                <span key={i} className="text-[9px] px-1 py-0.5 rounded bg-black/40 text-purple-300 border border-purple-800/30">
-                  {eff.type === 'attack_up' ? 'ATK+' : eff.type === 'defense_up' ? 'DEF+' : eff.type === 'poison' ? 'PSN' : eff.type === 'regen' ? 'RGN' : eff.type} {eff.remainingTurns}t
+              <div className="flex items-center gap-1 w-8">
+                <span className="text-xs font-bold text-red-400">HP</span>
+              </div>
+              <div className="flex-1 h-4 bg-black rounded border border-gray-600 overflow-hidden relative">
+                <div
+                  className="h-full transition-all duration-300"
+                  style={{
+                    width: `${(battleState.player.currentHp / battleState.player.maxHp) * 100}%`,
+                    background: 'linear-gradient(180deg, #ef4444 0%, #b91c1c 50%, #991b1b 100%)',
+                  }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                  {battleState.player.currentHp.toLocaleString()} / {battleState.player.maxHp.toLocaleString()}
                 </span>
-              ))}
-            </div>
-            {/* HP bar */}
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] text-red-400 w-5">HP</span>
-              <div className="w-32 h-2.5 bg-gray-900 rounded-full overflow-hidden border border-gray-700">
-                <div
-                  className="h-full bg-gradient-to-r from-red-700 to-red-400 transition-all duration-300"
-                  style={{ width: `${(battleState.player.currentHp / battleState.player.maxHp) * 100}%` }}
-                />
               </div>
-              <span className="text-[9px] text-gray-400">{battleState.player.currentHp.toLocaleString()}/{battleState.player.maxHp.toLocaleString()}</span>
             </div>
-            {/* MP bar */}
+            {/* MP */}
             <div className="flex items-center gap-2">
-              <span className="text-[9px] text-blue-400 w-5">MP</span>
-              <div className="w-32 h-2.5 bg-gray-900 rounded-full overflow-hidden border border-gray-700">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-700 to-blue-400 transition-all duration-300"
-                  style={{ width: `${(battleState.player.currentMp / battleState.player.maxMp) * 100}%` }}
-                />
+              <div className="flex items-center gap-1 w-8">
+                <span className="text-xs font-bold text-blue-400">MP</span>
               </div>
-              <span className="text-[9px] text-gray-400">{battleState.player.currentMp.toLocaleString()}/{battleState.player.maxMp.toLocaleString()}</span>
-            </div>
-            <div className="flex gap-2 text-[9px]">
-              <span className="text-red-400">ATK {battleState.player.attack.toLocaleString()}</span>
-              <span className="text-blue-400">DEF {battleState.player.defense.toLocaleString()}</span>
-              <span className="text-green-400">SPD {battleState.player.speed}</span>
+              <div className="flex-1 h-4 bg-black rounded border border-gray-600 overflow-hidden relative">
+                <div
+                  className="h-full transition-all duration-300"
+                  style={{
+                    width: `${(battleState.player.currentMp / battleState.player.maxMp) * 100}%`,
+                    background: 'linear-gradient(180deg, #3b82f6 0%, #1d4ed8 50%, #1e3a8a 100%)',
+                  }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+                  {battleState.player.currentMp.toLocaleString()} / {battleState.player.maxMp.toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Divider */}
+          <div className="w-px h-10 bg-gray-700" />
+
+          {/* Stats */}
+          <div className="flex flex-col gap-1 text-[11px] min-w-[120px]">
+            <div className="flex justify-between">
+              <span className="text-gray-500">ATK</span>
+              <span className="text-red-400 font-bold">{battleState.player.attack.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">DEF</span>
+              <span className="text-blue-400 font-bold">{battleState.player.defense.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">SPD</span>
+              <span className="text-green-400 font-bold">{battleState.player.speed}</span>
+            </div>
+          </div>
+
+          {/* Buffs */}
+          {battleState.player.statusEffects.length > 0 && (
+            <>
+              <div className="w-px h-10 bg-gray-700" />
+              <div className="flex flex-col gap-1 min-w-[50px]">
+                {battleState.player.statusEffects.map((eff, i) => (
+                  <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300 border border-purple-700/40 text-center whitespace-nowrap">
+                    {eff.type === 'attack_up' ? '\u2694 ATK+' : eff.type === 'defense_up' ? '\uD83D\uDEE1 DEF+' : eff.type === 'poison' ? '\u2620 독' : eff.type === 'regen' ? '\u2728 재생' : eff.type === 'shield' ? '\uD83D\uDCA0 보호막' : eff.type === 'burn' ? '\uD83D\uDD25 화상' : eff.type === 'bleed' ? '\uD83E\uDE78 출혈' : eff.type} {eff.remainingTurns}t
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* ═══ Bottom UI Panel ═══ */}
-      <div className="flex-1 flex flex-col bg-black/80 border-t border-gray-800">
+      <div className="flex-1 flex flex-col bg-black/80">
         {/* Battle log */}
         <div
           ref={logRef}

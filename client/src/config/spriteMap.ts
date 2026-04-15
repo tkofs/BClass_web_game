@@ -321,3 +321,28 @@ export function getDungeonBackground(dungeonId: string): DungeonBackground {
     color: '#1a1a2e',
   };
 }
+
+// ---------------------------------------------------------------------------
+// 5. PET_SPRITES
+// ---------------------------------------------------------------------------
+
+export const PET_SPRITES: Record<string, MonsterSpriteSet> = {
+  pet_wolf:          { idle: frames('wogol_idle_anim'), run: frames('wogol_run_anim') },
+  pet_cat:           { idle: frames('tiny_slug_anim'), run: frames('tiny_slug_anim') },
+  pet_turtle:        { idle: frames('muddy_anim'), run: frames('muddy_anim') },
+  pet_eagle:         { idle: frames('angel_idle_anim'), run: frames('angel_run_anim') },
+  pet_phoenix:       { idle: frames('imp_idle_anim'), run: frames('imp_run_anim') },
+  pet_dragon:        { idle: frames('chort_idle_anim'), run: frames('chort_run_anim') },
+  pet_unicorn:       { idle: frames('angel_idle_anim'), run: frames('angel_run_anim') },
+  pet_demon:         { idle: frames('big_demon_idle_anim'), run: frames('big_demon_run_anim') },
+  pet_angel:         { idle: frames('angel_idle_anim'), run: frames('angel_run_anim') },
+  pet_myth_dragon:   { idle: frames('big_demon_idle_anim'), run: frames('big_demon_run_anim') },
+  pet_myth_void:     { idle: frames('necromancer_anim'), run: frames('necromancer_anim') },
+  pet_myth_eagle:    { idle: frames('angel_idle_anim'), run: frames('angel_run_anim') },
+  pet_myth_unicorn:  { idle: frames('angel_idle_anim'), run: frames('angel_run_anim') },
+  pet_myth_reaper:   { idle: frames('skelet_idle_anim'), run: frames('skelet_run_anim') },
+};
+
+export function getPetSprite(petId: string): MonsterSpriteSet {
+  return PET_SPRITES[petId] ?? { idle: frames('imp_idle_anim'), run: frames('imp_run_anim') };
+}

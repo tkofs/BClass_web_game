@@ -36,6 +36,7 @@ export interface SaveData {
   petGachaPity: number;    // pulls since last mythic pet drop
   itemOptions: Record<string, RandomOption[]>;  // itemId -> random options
   gachaPity: number;  // pulls since last mythic drop
+  passiveTree: { allocatedNodes: string[] };
   blessings: { type: string; expiresAt: string }[];
   appearance: { color: string };
   createdAt: string;
