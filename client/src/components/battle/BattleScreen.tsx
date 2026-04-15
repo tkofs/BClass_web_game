@@ -655,7 +655,7 @@ function BattleScreen() {
         {/* Battle log */}
         <div
           ref={logRef}
-          className="h-[120px] overflow-y-auto px-3 py-2 text-xs space-y-0.5 border-b border-gray-800/50"
+          className="h-[360px] overflow-y-auto px-3 py-2 text-xs space-y-0.5 border-b border-gray-800/50"
         >
           {battleLog.length === 0 && (
             <p className="text-gray-600 text-center">전투가 시작됩니다...</p>
