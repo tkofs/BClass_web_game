@@ -7,10 +7,10 @@ import { generateOptions } from './OptionService';
 // ────────────────────────────────────────────────────────────
 
 /**
- * Exp-to-next formula: level * 100.
+ * Exp-to-next formula: level * 100 + level³ * 0.01 (후반 급등).
  */
 function expToNextLevel(level: number): number {
-  return level * 100;
+  return Math.round(level * 100 + level * level * level * 0.01);
 }
 
 export interface LevelUpResult {

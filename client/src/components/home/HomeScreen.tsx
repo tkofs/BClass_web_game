@@ -129,7 +129,10 @@ function HomeScreen() {
   // Total combat stats (shared calculation)
   const totalStats = useMemo(() => saveData ? calculateTotalStats(saveData) : null, [saveData]);
 
-  const expToNext = useMemo(() => (saveData?.level ?? 1) * 100, [saveData?.level]);
+  const expToNext = useMemo(() => {
+    const lv = saveData?.level ?? 1;
+    return Math.round(lv * 100 + lv * lv * lv * 0.01);
+  }, [saveData?.level]);
 
   const handleLogout = useCallback(() => { logout(); navigate('/'); }, [logout, navigate]);
   const handleCopy = useCallback(async () => {
