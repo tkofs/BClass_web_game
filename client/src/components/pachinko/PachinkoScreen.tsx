@@ -692,6 +692,11 @@ function PachinkoScreen() {
       return;
     }
 
+    // Optimistic gold deduction (server will confirm)
+    if (saveData) {
+      updateSaveData({ ...saveData, gold: saveData.gold - cost });
+    }
+
     // First click: reset board
     if (!playingRef.current) {
       PEGS = buildPegs();
