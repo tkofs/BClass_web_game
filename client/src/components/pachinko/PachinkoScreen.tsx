@@ -186,8 +186,12 @@ function PachinkoScreen() {
   const physicsStep = useCallback(() => {
     const balls = ballsRef.current;
     const sparks = sparksRef.current;
+    const now = Date.now();
 
-    for (const ball of balls) {
+    // Remove settled balls after 1 second to free memory
+    ballsRef.current = balls.filter(b => !b.settled || (now - b.settleTime) < 1000);
+
+    for (const ball of ballsRef.current) {
       if (!ball.active || ball.settled) continue;
 
       // Gravity
@@ -229,10 +233,10 @@ function PachinkoScreen() {
           ball.vy *= PEG_BOUNCE;
           ball.vx += (Math.random() - 0.5) * 1.0;
 
-          // Spark
+          // Spark (limit when many balls)
           const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-          if (speed > 1) {
-            for (let s = 0; s < 3; s++) {
+          if (speed > 1 && sparks.length < 200) {
+            for (let s = 0; s < (ballsRef.current.length > 50 ? 1 : 3); s++) {
               sparks.push({
                 x: peg.x + nx * PEG_RADIUS,
                 y: peg.y + ny * PEG_RADIUS,
@@ -247,7 +251,9 @@ function PachinkoScreen() {
         }
       }
 
-      // Ball-ball collisions
+      // Ball-ball collisions (skip if too many active balls for performance)
+      const activeBallCount = balls.filter(b => b.active && !b.settled).length;
+      if (activeBallCount <= 50) {
       for (const other of balls) {
         if (other === ball || !other.active || other.settled) continue;
         const dx = ball.x - other.x;
@@ -275,6 +281,7 @@ function PachinkoScreen() {
           }
         }
       }
+      } // end ball-ball collision guard
 
       // Wall collisions
       if (ball.x < ball.radius) {
