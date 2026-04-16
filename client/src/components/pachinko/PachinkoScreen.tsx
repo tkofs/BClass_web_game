@@ -871,7 +871,43 @@ function PachinkoScreen() {
         </div>
       </div>
 
-      {/* Play Buttons */}
+      {/* Shake + Play Buttons */}
+      {playing && (
+        <div className="flex justify-center mb-2">
+          <Button
+            onClick={() => {
+              const SHAKE_COST = 10_000;
+              if (gold < SHAKE_COST) { toast.error('골드가 부족합니다.'); return; }
+              if (saveData) updateSaveData({ ...saveData, gold: saveData.gold - SHAKE_COST });
+              // Shake all active balls
+              for (const ball of ballsRef.current) {
+                if (ball.active && !ball.settled) {
+                  ball.vx += (Math.random() - 0.5) * 8;
+                  ball.vy += (Math.random() - 0.5) * 4 - 2;
+                }
+              }
+              // Jitter pegs slightly
+              for (const peg of PEGS) {
+                peg.x += (Math.random() - 0.5) * 4;
+                peg.y += (Math.random() - 0.5) * 2;
+              }
+              // Screen shake effect
+              const canvas = canvasRef.current;
+              if (canvas) {
+                canvas.style.transform = 'translateX(5px) rotate(0.5deg)';
+                setTimeout(() => { canvas.style.transform = 'translateX(-5px) rotate(-0.5deg)'; }, 50);
+                setTimeout(() => { canvas.style.transform = 'translateX(3px)'; }, 100);
+                setTimeout(() => { canvas.style.transform = ''; }, 150);
+              }
+            }}
+            disabled={gold < 10_000}
+            className="px-6 py-2 bg-orange-700 hover:bg-orange-600 border border-orange-500/50 transition-all disabled:opacity-40"
+          >
+            <span className="text-sm font-bold text-orange-200">흔들기 (10,000G)</span>
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-2 mb-4 max-w-xl mx-auto">
         <Button
           onClick={() => doPlay(1)}
