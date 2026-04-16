@@ -100,31 +100,41 @@ interface Spark {
   color: string;
 }
 
-/* ── Build pegs (triangle shape: narrow top, wide bottom) ── */
+/* ── Build pegs (triangle shape with random jitter) ── */
 function buildPegs(): { x: number; y: number }[] {
   const pegs: { x: number; y: number }[] = [];
   const totalRows = 12;
-  const minCols = 3;  // top row
-  const maxCols = 11; // bottom row (covers full width)
+  const minCols = 3;
+  const maxCols = 11;
   for (let row = 0; row < totalRows; row++) {
-    const t = row / (totalRows - 1); // 0 at top, 1 at bottom
+    const t = row / (totalRows - 1);
     const cols = Math.round(minCols + t * (maxCols - minCols));
     const even = row % 2 === 0;
     const actualCols = even ? cols : cols + 1;
-    const spacing = (CANVAS_W - 40) / (actualCols);
+    const spacing = (CANVAS_W - 40) / actualCols;
     const startX = 20 + spacing / 2;
     const y = PEG_START_Y + row * ((PEG_END_Y - PEG_START_Y) / (totalRows - 1));
+
+    // Jitter: 20% of spacing, clamped between 5~12px
+    const maxJitter = Math.max(5, Math.min(12, spacing * 0.2));
+
     for (let col = 0; col < actualCols; col++) {
-      pegs.push({
-        x: startX + col * spacing + (even ? 0 : spacing * 0.5 - spacing / (actualCols) * 0.5),
-        y,
-      });
+      const baseX = startX + col * spacing + (even ? 0 : spacing * 0.5 - spacing / actualCols * 0.5);
+      const jx = (Math.random() * 2 - 1) * maxJitter;
+      const jy = (Math.random() * 2 - 1) * maxJitter * 0.6; // less vertical jitter
+
+      // Clamp within canvas bounds
+      const finalX = Math.max(PEG_RADIUS + 5, Math.min(CANVAS_W - PEG_RADIUS - 5, baseX + jx));
+      const finalY = Math.max(PEG_START_Y, Math.min(PEG_END_Y, y + jy));
+
+      pegs.push({ x: finalX, y: finalY });
     }
   }
   return pegs;
 }
 
-const PEGS = buildPegs();
+// Initial peg layout (will be regenerated each play)
+let PEGS = buildPegs();
 
 /* ── Divider positions ── */
 function buildDividers(): { x: number; y1: number; y2: number }[] {
@@ -680,6 +690,9 @@ function PachinkoScreen() {
       toast.error('골드가 부족합니다.');
       return;
     }
+
+    // Regenerate peg layout each game
+    PEGS = buildPegs();
 
     setPlaying(true);
     playingRef.current = true;
