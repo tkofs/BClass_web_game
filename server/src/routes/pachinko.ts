@@ -12,64 +12,24 @@ const COST_MAP: Record<number, number> = {
   100: 8_000_000, // 20% discount
 };
 
-// ── Reward table (base probabilities for 'center') ──
-interface RewardEntry {
+// ── Fixed pocket rewards (index 0-8) ──
+interface PocketReward {
   id: string;
   name: string;
-  chance: number;
   reward: { gold?: number; gems?: number; itemId?: string; quantity?: number } | null;
 }
 
-const BASE_REWARDS: RewardEntry[] = [
-  { id: 'miss', name: '꽝', chance: 0.25, reward: null },
-  { id: 'gold_s', name: '소량 골드', chance: 0.20, reward: { gold: 3000 } },
-  { id: 'gold_m', name: '중량 골드', chance: 0.15, reward: { gold: 8000 } },
-  { id: 'gold_l', name: '대량 골드', chance: 0.08, reward: { gold: 25000 } },
-  { id: 'stone_common', name: '일반 강화석', chance: 0.12, reward: { itemId: 'enhance_stone_common', quantity: 3 } },
-  { id: 'stone_rare', name: '희귀 강화석', chance: 0.08, reward: { itemId: 'enhance_stone_rare', quantity: 2 } },
-  { id: 'stone_epic', name: '영웅 강화석', chance: 0.05, reward: { itemId: 'enhance_stone_epic', quantity: 1 } },
-  { id: 'gems', name: '젬', chance: 0.05, reward: { gems: 50 } },
-  { id: 'jackpot', name: '잭팟', chance: 0.02, reward: { gems: 500, itemId: 'enhance_stone_legendary', quantity: 5 } },
+const POCKET_REWARDS: PocketReward[] = [
+  { id: 'jackpot', name: '잭팟', reward: { gems: 500, itemId: 'enhance_stone_legendary', quantity: 5 } },
+  { id: 'miss', name: '꽝', reward: null },
+  { id: 'gems', name: '젬', reward: { gems: 50 } },
+  { id: 'stone_epic', name: '영웅 강화석', reward: { itemId: 'enhance_stone_epic', quantity: 1 } },
+  { id: 'gold_s', name: '소량 골드', reward: { gold: 30000 } },
+  { id: 'stone_rare', name: '희귀 강화석', reward: { itemId: 'enhance_stone_rare', quantity: 2 } },
+  { id: 'gold_m', name: '중량 골드', reward: { gold: 80000 } },
+  { id: 'miss2', name: '꽝', reward: null },
+  { id: 'gold_l', name: '대량 골드', reward: { gold: 250000 } },
 ];
-
-// ── Position modifiers ──
-type Position = 'left' | 'center' | 'right';
-
-const POSITION_MODIFIERS: Record<Position, Record<string, number>> = {
-  left: {
-    stone_common: +0.03,
-    stone_rare: +0.03,
-    stone_epic: +0.03,
-    gold_s: -0.03,
-    gold_m: -0.03,
-  },
-  center: {},
-  right: {
-    gold_m: +0.03,
-    gems: +0.03,
-    stone_common: -0.03,
-    stone_rare: -0.03,
-  },
-};
-
-function getModifiedTable(position: Position): RewardEntry[] {
-  const mods = POSITION_MODIFIERS[position];
-  return BASE_REWARDS.map(entry => ({
-    ...entry,
-    chance: Math.max(0, entry.chance + (mods[entry.id] ?? 0)),
-  }));
-}
-
-function rollReward(table: RewardEntry[]): RewardEntry {
-  const totalWeight = table.reduce((sum, e) => sum + e.chance, 0);
-  let roll = Math.random() * totalWeight;
-  for (const entry of table) {
-    roll -= entry.chance;
-    if (roll <= 0) return entry;
-  }
-  // Fallback to last entry (should not happen)
-  return table[table.length - 1];
-}
 
 function extractSaveCode(req: Request, res: Response): string | null {
   const authHeader = req.headers.authorization;
@@ -98,19 +58,26 @@ router.post('/play', (req: Request, res: Response): void => {
       return;
     }
 
-    const { position } = req.body;
     const count = Number(req.body.count);
-
-    // Validate position
-    if (!position || !['left', 'center', 'right'].includes(position)) {
-      res.status(400).json({ success: false, message: '유효하지 않은 위치입니다 (left/center/right)' });
-      return;
-    }
+    const pockets: number[] = req.body.pockets;
 
     // Validate count
     if (![1, 10, 100].includes(count)) {
       res.status(400).json({ success: false, message: '유효하지 않은 횟수입니다 (1/10/100)' });
       return;
+    }
+
+    // Validate pockets array
+    if (!Array.isArray(pockets) || pockets.length !== count) {
+      res.status(400).json({ success: false, message: '포켓 결과 배열이 유효하지 않습니다.' });
+      return;
+    }
+
+    for (const p of pockets) {
+      if (typeof p !== 'number' || p < 0 || p > 8 || !Number.isInteger(p)) {
+        res.status(400).json({ success: false, message: '유효하지 않은 포켓 인덱스입니다 (0-8).' });
+        return;
+      }
     }
 
     // Calculate cost
@@ -125,33 +92,15 @@ router.post('/play', (req: Request, res: Response): void => {
     // Deduct gold
     saveData.gold -= totalCost;
 
-    // Build modified table for this position
-    const table = getModifiedTable(position as Position);
-
-    // Roll results and accumulate rewards
-    const results: { id: string; name: string; slot: number; reward: { type: string; label: string; amount: number; unit: string } }[] = [];
+    // Process pocket results and accumulate rewards
+    const results: { pocket: number; name: string }[] = [];
     let totalGold = 0;
     let totalGems = 0;
     const itemAccumulator: Record<string, number> = {};
 
-    // Map reward IDs to slot indices
-    const SLOT_MAP: Record<string, number> = {
-      miss: 0, gold_s: 1, gold_m: 2, gold_l: 3,
-      stone_common: 4, stone_rare: 5, stone_epic: 6, gems: 7, jackpot: 8,
-    };
-
-    for (let i = 0; i < count; i++) {
-      const entry = rollReward(table);
-      const slot = SLOT_MAP[entry.id] ?? 0;
-      // Build reward label
-      let label = '꽝', amount = 0, unit = '', type = 'miss';
-      if (entry.reward) {
-        if (entry.reward.gold) { label = entry.name; amount = entry.reward.gold; unit = 'G'; type = 'gold'; }
-        else if (entry.reward.gems && entry.reward.itemId) { label = entry.name; amount = entry.reward.gems; unit = '젬+강화석'; type = 'jackpot'; }
-        else if (entry.reward.gems) { label = entry.name; amount = entry.reward.gems; unit = '젬'; type = 'gems'; }
-        else if (entry.reward.itemId) { label = entry.name; amount = entry.reward.quantity ?? 1; unit = '개'; type = 'item'; }
-      }
-      results.push({ id: entry.id, name: entry.name, slot, reward: { type, label, amount, unit } });
+    for (const pocketIdx of pockets) {
+      const entry = POCKET_REWARDS[pocketIdx];
+      results.push({ pocket: pocketIdx, name: entry.name });
 
       if (entry.reward) {
         if (entry.reward.gold) totalGold += entry.reward.gold;

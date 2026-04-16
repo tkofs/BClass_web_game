@@ -5,38 +5,24 @@ import axios from 'axios';
 import Button from '@/components/common/Button';
 import { toast } from '@/components/common/Toast';
 
-/* ── Reward types & colors ── */
-const SLOT_CONFIG = [
-  { id: 'miss',         label: '꽝',       color: '#6B7280' },
-  { id: 'gold_small',   label: '소량 골드', color: '#D4A017' },
-  { id: 'gold_medium',  label: '중량 골드', color: '#EAB308' },
-  { id: 'gold_large',   label: '대량 골드', color: '#F59E0B' },
-  { id: 'stone_normal', label: '일반 강화석', color: '#22C55E' },
-  { id: 'stone_rare',   label: '희귀 강화석', color: '#3B82F6' },
-  { id: 'stone_epic',   label: '영웅 강화석', color: '#8B5CF6' },
-  { id: 'gem',          label: '젬',       color: '#06B6D4' },
-  { id: 'jackpot',      label: '잭팟',     color: '#EF4444' },
+/* ── Fixed pocket config (matches server POCKET_REWARDS order) ── */
+const POCKET_CONFIG = [
+  { id: 'jackpot', label: '잭팟', color: '#EF4444' },
+  { id: 'miss', label: '꽝', color: '#6B7280' },
+  { id: 'gems', label: '젬', color: '#06B6D4' },
+  { id: 'stone_epic', label: '영웅', color: '#8B5CF6' },
+  { id: 'gold_s', label: '소골드', color: '#D4A017' },
+  { id: 'stone_rare', label: '희귀', color: '#3B82F6' },
+  { id: 'gold_m', label: '중골드', color: '#EAB308' },
+  { id: 'miss2', label: '꽝', color: '#6B7280' },
+  { id: 'gold_l', label: '대골드', color: '#F59E0B' },
 ] as const;
-
-type Position = 'left' | 'center' | 'right';
-
-interface PlayResult {
-  id: string;
-  name: string;
-  slot: number;
-  reward: {
-    type: string;
-    label: string;
-    amount: number;
-    unit: string;
-  };
-}
 
 interface MultiSummary {
   counts: Record<string, number>;
   totalGold: number;
   totalGems: number;
-  totalStones: number;
+  totalItems: number;
 }
 
 /* ── Stats persisted in localStorage ── */
@@ -98,7 +84,6 @@ interface Ball {
   active: boolean;
   settled: boolean;
   resultSlot: number;
-  targetSlot: number;
   color: string;
   trail: { x: number; y: number }[];
   settleTime: number;
@@ -167,10 +152,9 @@ function PachinkoScreen() {
   const saveData = useAuthStore((s) => s.saveData);
   const updateSaveData = useAuthStore((s) => s.updateSaveData);
 
-  const position: Position = 'center';
   const [playing, setPlaying] = useState(false);
-  const [singleResult, setSingleResult] = useState<PlayResult | null>(null);
   const [multiSummary, setMultiSummary] = useState<MultiSummary | null>(null);
+  const [singlePocket, setSinglePocket] = useState<number | null>(null);
   const [stats, setStats] = useState<PachinkoStats>(loadStats);
   const [runningTally, setRunningTally] = useState<Record<string, number>>({});
   const [jackpotFlash, setJackpotFlash] = useState(0);
@@ -184,6 +168,7 @@ function PachinkoScreen() {
   const pocketPopupRef = useRef<({ label: string; color: string; life: number; offsetY: number } | null)[]>(new Array(SLOT_COUNT).fill(null));
   const onAllSettledRef = useRef<(() => void) | null>(null);
   const jackpotFlashRef = useRef(0);
+  const pendingCountRef = useRef<1 | 10 | 100>(1);
 
   const gold = saveData?.gold ?? 0;
 
@@ -295,10 +280,8 @@ function PachinkoScreen() {
         ball.vy = Math.abs(ball.vy) * BOUNCE_DAMPING;
       }
 
-
       // Funnel walls at top of pocket area
       if (ball.y >= POCKET_TOP_Y - 20 && ball.y < POCKET_TOP_Y) {
-        // Gentle funnel
         const pocketIdx = Math.floor(ball.x / POCKET_W);
         const pocketCenter = pocketIdx * POCKET_W + POCKET_W / 2;
         const diff = pocketCenter - ball.x;
@@ -330,35 +313,33 @@ function PachinkoScreen() {
           ball.vy = 0;
           ball.vx = 0;
 
-          // Determine visual slot from actual position
+          // Determine pocket from actual physics position
           const visualSlot = Math.max(0, Math.min(SLOT_COUNT - 1, Math.floor(ball.x / POCKET_W)));
-          // Use server result (targetSlot) for reward, visual pocket for display
-          const rewardSlot = ball.targetSlot >= 0 ? ball.targetSlot : visualSlot;
           ball.resultSlot = visualSlot;
 
           // Snap to pocket center
           ball.x = getPocketCenterX(visualSlot);
           ball.y = POCKET_BOTTOM_Y - ball.radius - 5;
 
-          // Flash the visual pocket + show reward popup
-          const cfg = SLOT_CONFIG[rewardSlot];
+          // Flash the pocket + show reward popup
+          const cfg = POCKET_CONFIG[visualSlot];
           pocketFlashRef.current[visualSlot] = 1.0;
           if (cfg) {
             pocketPopupRef.current[visualSlot] = {
               label: cfg.label,
               color: cfg.color,
-              life: 60, // ~1 second
+              life: 60,
               offsetY: 0,
             };
           }
 
-          // Jackpot flash (check server result)
-          if (rewardSlot === 8) {
+          // Jackpot flash
+          if (visualSlot === 0) {
             jackpotFlashRef.current = 1.0;
             setJackpotFlash(1);
           }
 
-          // Update running tally using server result
+          // Update running tally
           if (cfg) {
             setRunningTally(prev => ({
               ...prev,
@@ -433,7 +414,6 @@ function PachinkoScreen() {
 
     // Pegs
     for (const peg of PEGS) {
-      // Glow
       ctx.save();
       ctx.shadowColor = '#6366F1';
       ctx.shadowBlur = 8;
@@ -446,7 +426,6 @@ function PachinkoScreen() {
       ctx.fill();
       ctx.restore();
 
-      // Outline
       ctx.beginPath();
       ctx.arc(peg.x, peg.y, PEG_RADIUS, 0, Math.PI * 2);
       ctx.strokeStyle = '#A5B4FC';
@@ -458,30 +437,31 @@ function PachinkoScreen() {
     ctx.fillStyle = 'rgba(10, 10, 30, 0.5)';
     ctx.fillRect(0, POCKET_TOP_Y, w, DIVIDER_H + 50);
 
-    // Pocket fills (neutral dark) and flashes
+    // Pocket fills with FIXED labels and colors
     for (let i = 0; i < SLOT_COUNT; i++) {
       const px = i * POCKET_W;
       const flash = pocketFlashRef.current[i];
       const popupInfo = pocketPopupRef.current[i];
+      const cfg = POCKET_CONFIG[i];
 
-      // Base neutral fill
-      ctx.fillStyle = '#1a1a2e';
+      // Base fill with pocket's own color (subtle)
+      ctx.fillStyle = cfg.color + '15';
       ctx.fillRect(px, POCKET_TOP_Y, POCKET_W, DIVIDER_H);
 
-      // Flash overlay with reward color
-      if (flash > 0 && popupInfo) {
-        ctx.fillStyle = popupInfo.color + Math.floor(flash * 200).toString(16).padStart(2, '0');
+      // Flash overlay when ball lands
+      if (flash > 0) {
+        ctx.fillStyle = cfg.color + Math.floor(flash * 200).toString(16).padStart(2, '0');
         ctx.fillRect(px, POCKET_TOP_Y, POCKET_W, DIVIDER_H);
       }
 
-      // Pocket number
-      ctx.fillStyle = '#4B5563';
-      ctx.font = '8px sans-serif';
+      // Fixed pocket label (always visible)
+      ctx.fillStyle = cfg.color + '90';
+      ctx.font = 'bold 9px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${i + 1}`, px + POCKET_W / 2, POCKET_TOP_Y + DIVIDER_H - 6);
+      ctx.fillText(cfg.label, px + POCKET_W / 2, POCKET_TOP_Y + DIVIDER_H - 10);
 
-      // Reward popup text (shows after ball lands)
+      // Reward popup text (shows after ball lands, floats up)
       if (popupInfo && popupInfo.life > 0) {
         const alpha = Math.min(1, popupInfo.life / 30);
         ctx.fillStyle = popupInfo.color;
@@ -494,7 +474,7 @@ function PachinkoScreen() {
       }
     }
 
-    // Divider walls (metallic silver)
+    // Divider walls
     for (const div of DIVIDERS) {
       if (div.x <= 0 || div.x >= w) continue;
       const dGrad = ctx.createLinearGradient(div.x - DIVIDER_W / 2, 0, div.x + DIVIDER_W / 2, 0);
@@ -505,7 +485,7 @@ function PachinkoScreen() {
       ctx.fillRect(div.x - DIVIDER_W / 2, div.y1, DIVIDER_W, DIVIDER_H);
     }
 
-    // Left and right walls of pocket area
+    // Left and right walls
     const wallGrad = ctx.createLinearGradient(0, 0, DIVIDER_W, 0);
     wallGrad.addColorStop(0, '#9CA3AF');
     wallGrad.addColorStop(1, '#6B7280');
@@ -513,15 +493,13 @@ function PachinkoScreen() {
     ctx.fillRect(0, POCKET_TOP_Y, DIVIDER_W, DIVIDER_H);
     ctx.fillRect(w - DIVIDER_W, POCKET_TOP_Y, DIVIDER_W, DIVIDER_H);
 
-    // Funnel guides (triangular shapes above pockets)
+    // Funnel guides
     ctx.strokeStyle = '#4B5563';
     ctx.lineWidth = 2;
-    // Left funnel wall
     ctx.beginPath();
     ctx.moveTo(20, POCKET_TOP_Y - 40);
     ctx.lineTo(0, POCKET_TOP_Y);
     ctx.stroke();
-    // Right funnel wall
     ctx.beginPath();
     ctx.moveTo(w - 20, POCKET_TOP_Y - 40);
     ctx.lineTo(w, POCKET_TOP_Y);
@@ -582,7 +560,7 @@ function PachinkoScreen() {
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, w - 2, h - 2);
 
-    // Drop zone indicator at top
+    // Drop zone indicator
     ctx.fillStyle = 'rgba(99, 102, 241, 0.1)';
     ctx.fillRect(0, 0, w, 40);
     ctx.strokeStyle = '#6366F150';
@@ -601,7 +579,6 @@ function PachinkoScreen() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas resolution
     const dpr = window.devicePixelRatio || 1;
     canvas.width = CANVAS_W * dpr;
     canvas.height = CANVAS_H * dpr;
@@ -611,15 +588,11 @@ function PachinkoScreen() {
 
     const loop = () => {
       if (!running) return;
-
-      // Reset transform for each frame
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
       if (ballsRef.current.length > 0) {
         physicsStep();
       }
       renderFrame(ctx);
-
       animFrameRef.current = requestAnimationFrame(loop);
     };
 
@@ -631,9 +604,9 @@ function PachinkoScreen() {
     };
   }, [physicsStep, renderFrame]);
 
-  /* ── Spawn a ball ── */
-  const spawnBall = useCallback((targetSlot: number, pos: Position) => {
-    const baseX = pos === 'left' ? 125 : pos === 'right' ? 375 : 250;
+  /* ── Spawn a ball (no target - pure physics) ── */
+  const spawnBall = useCallback(() => {
+    const baseX = 250;
     const x = baseX + (Math.random() - 0.5) * 30;
     const ball: Ball = {
       x,
@@ -644,7 +617,6 @@ function PachinkoScreen() {
       active: true,
       settled: false,
       resultSlot: -1,
-      targetSlot,
       color: '#FFD700',
       trail: [],
       settleTime: 0,
@@ -652,28 +624,12 @@ function PachinkoScreen() {
     ballsRef.current.push(ball);
   }, []);
 
-  /* ── API call ── */
-  const doPlay = useCallback(async (count: 1 | 10 | 100) => {
-    const cost = count === 1 ? COST_1 : count === 10 ? COST_10 : COST_100;
-    if (gold < cost) {
-      toast.error('골드가 부족합니다.');
-      return;
-    }
-
-    setPlaying(true);
-    playingRef.current = true;
-    setSingleResult(null);
-    setMultiSummary(null);
-    setRunningTally({});
-    ballsRef.current = [];
-    sparksRef.current = [];
-    pocketFlashRef.current = new Array(SLOT_COUNT).fill(0);
-    pocketPopupRef.current = new Array(SLOT_COUNT).fill(null);
-    jackpotFlashRef.current = 0;
-    setJackpotFlash(0);
+  /* ── Send results to server after all balls settle ── */
+  const sendResults = useCallback(async (count: 1 | 10 | 100, cost: number) => {
+    const pocketResults = ballsRef.current.map(b => b.resultSlot);
 
     try {
-      const res = await axios.post('/api/pachinko/play', { position, count });
+      const res = await axios.post('/api/pachinko/play', { count, pockets: pocketResults });
       if (!res.data.success) {
         toast.error(res.data.message || '플레이에 실패했습니다.');
         setPlaying(false);
@@ -681,7 +637,6 @@ function PachinkoScreen() {
         return;
       }
 
-      const results: PlayResult[] = res.data.results;
       if (res.data.saveData) {
         updateSaveData(res.data.saveData);
       }
@@ -699,90 +654,124 @@ function PachinkoScreen() {
         return next;
       });
 
-      // Spawn balls with staggered timing
-      const spawnInterval = count === 1 ? 0 : count === 10 ? 300 : 80;
-
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        if (i === 0) {
-          spawnBall(result.slot, position);
-        } else {
-          setTimeout(() => {
-            if (playingRef.current) {
-              spawnBall(result.slot, position);
-            }
-          }, i * spawnInterval);
-        }
+      // Show result
+      if (count === 1) {
+        const pocket = pocketResults[0];
+        setSinglePocket(pocket);
+      } else {
+        const summary = buildMultiSummary(pocketResults);
+        setMultiSummary(summary);
       }
-
-      // Set callback for when all balls settle
-      onAllSettledRef.current = () => {
-        if (count === 1 && results.length === 1) {
-          setSingleResult(results[0]);
-        } else {
-          const summary = buildMultiSummary(results);
-          setMultiSummary(summary);
-        }
-        setPlaying(false);
-        playingRef.current = false;
-      };
-
-      // Safety timeout: force finish after a generous timeout
-      const maxTime = count === 1 ? 15000 : count === 10 ? 25000 : 60000;
-      setTimeout(() => {
-        if (playingRef.current) {
-          // Force settle all balls
-          for (const ball of ballsRef.current) {
-            if (!ball.settled) {
-              ball.settled = true;
-              ball.settleTime = Date.now();
-              const slot = ball.targetSlot >= 0 ? ball.targetSlot : Math.floor(ball.x / POCKET_W);
-              ball.resultSlot = Math.max(0, Math.min(SLOT_COUNT - 1, slot));
-              ball.x = getPocketCenterX(ball.resultSlot);
-              ball.y = POCKET_BOTTOM_Y - ball.radius - 5;
-              ball.vx = 0;
-              ball.vy = 0;
-            }
-          }
-          if (onAllSettledRef.current) {
-            const cb = onAllSettledRef.current;
-            onAllSettledRef.current = null;
-            cb();
-          }
-        }
-      }, maxTime);
-
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) && err.response?.data?.message
         ? err.response.data.message
         : '파칭코 플레이에 실패했습니다.';
       toast.error(msg);
+    } finally {
       setPlaying(false);
       playingRef.current = false;
     }
-  }, [gold, position, updateSaveData, spawnBall]);
+  }, [updateSaveData]);
 
-  /* Build multi-play summary */
-  const buildMultiSummary = (results: PlayResult[]): MultiSummary => {
+  /* ── Play handler ── */
+  const doPlay = useCallback((count: 1 | 10 | 100) => {
+    const cost = count === 1 ? COST_1 : count === 10 ? COST_10 : COST_100;
+    if (gold < cost) {
+      toast.error('골드가 부족합니다.');
+      return;
+    }
+
+    setPlaying(true);
+    playingRef.current = true;
+    setSinglePocket(null);
+    setMultiSummary(null);
+    setRunningTally({});
+    ballsRef.current = [];
+    sparksRef.current = [];
+    pocketFlashRef.current = new Array(SLOT_COUNT).fill(0);
+    pocketPopupRef.current = new Array(SLOT_COUNT).fill(null);
+    jackpotFlashRef.current = 0;
+    setJackpotFlash(0);
+    pendingCountRef.current = count;
+
+    // Spawn balls with staggered timing
+    const spawnInterval = count === 1 ? 0 : count === 10 ? 300 : 80;
+
+    for (let i = 0; i < count; i++) {
+      if (i === 0) {
+        spawnBall();
+      } else {
+        setTimeout(() => {
+          if (playingRef.current) {
+            spawnBall();
+          }
+        }, i * spawnInterval);
+      }
+    }
+
+    // Set callback for when all balls settle - THEN send to server
+    onAllSettledRef.current = () => {
+      sendResults(count, cost);
+    };
+
+    // Safety timeout
+    const maxTime = count === 1 ? 15000 : count === 10 ? 25000 : 60000;
+    setTimeout(() => {
+      if (playingRef.current) {
+        for (const ball of ballsRef.current) {
+          if (!ball.settled) {
+            ball.settled = true;
+            ball.settleTime = Date.now();
+            const slot = Math.max(0, Math.min(SLOT_COUNT - 1, Math.floor(ball.x / POCKET_W)));
+            ball.resultSlot = slot;
+            ball.x = getPocketCenterX(slot);
+            ball.y = POCKET_BOTTOM_Y - ball.radius - 5;
+            ball.vx = 0;
+            ball.vy = 0;
+          }
+        }
+        if (onAllSettledRef.current) {
+          const cb = onAllSettledRef.current;
+          onAllSettledRef.current = null;
+          cb();
+        }
+      }
+    }, maxTime);
+  }, [gold, spawnBall, sendResults]);
+
+  /* Build multi-play summary from pocket indices */
+  const buildMultiSummary = (pockets: number[]): MultiSummary => {
     const counts: Record<string, number> = {};
     let totalGold = 0;
     let totalGems = 0;
-    let totalStones = 0;
+    let totalItems = 0;
 
-    for (const r of results) {
-      const label = r.reward.label;
-      counts[label] = (counts[label] ?? 0) + 1;
-      if (r.reward.unit === 'G') totalGold += r.reward.amount;
-      if (r.reward.unit === '젬') totalGems += r.reward.amount;
-      if (r.reward.unit === '개') totalStones += r.reward.amount;
+    for (const p of pockets) {
+      const cfg = POCKET_CONFIG[p];
+      if (cfg) {
+        counts[cfg.label] = (counts[cfg.label] ?? 0) + 1;
+      }
+      // Approximate totals from pocket config (server has exact values)
+      if (cfg?.id === 'gold_s') totalGold += 30000;
+      else if (cfg?.id === 'gold_m') totalGold += 80000;
+      else if (cfg?.id === 'gold_l') totalGold += 250000;
+      else if (cfg?.id === 'gems') totalGems += 50;
+      else if (cfg?.id === 'jackpot') { totalGems += 500; totalItems += 5; }
+      else if (cfg?.id === 'stone_epic') totalItems += 1;
+      else if (cfg?.id === 'stone_rare') totalItems += 2;
     }
-    return { counts, totalGold, totalGems, totalStones };
+    return { counts, totalGold, totalGems, totalItems };
   };
 
-  const slotColorForResult = useMemo(() => {
-    if (singleResult == null) return '#fff';
-    return SLOT_CONFIG[singleResult.slot]?.color ?? '#fff';
-  }, [singleResult]);
+  const singlePocketColor = useMemo(() => {
+    if (singlePocket == null) return '#fff';
+    return POCKET_CONFIG[singlePocket]?.color ?? '#fff';
+  }, [singlePocket]);
+
+  const singlePocketLabel = useMemo(() => {
+    if (singlePocket == null) return '';
+    return POCKET_CONFIG[singlePocket]?.label ?? '';
+  }, [singlePocket]);
 
   if (!saveData) return null;
 
@@ -828,11 +817,11 @@ function PachinkoScreen() {
             <h3 className="text-xs font-bold text-gray-400 mb-2 border-b border-gray-700 pb-2">
               {playing ? '진행중...' : '현재 결과'}
             </h3>
-            {Object.keys(runningTally).length === 0 && !playing && !singleResult && !multiSummary && (
+            {Object.keys(runningTally).length === 0 && !playing && singlePocket == null && !multiSummary && (
               <p className="text-xs text-gray-600 text-center py-4">플레이를 시작하세요</p>
             )}
             {Object.entries(runningTally).map(([label, count]) => {
-              const cfg = SLOT_CONFIG.find(s => s.label === label);
+              const cfg = POCKET_CONFIG.find(s => s.label === label);
               return (
                 <div key={label} className="flex items-center justify-between text-xs py-1">
                   <span style={{ color: cfg?.color ?? '#9CA3AF' }}>{label}</span>
@@ -885,19 +874,16 @@ function PachinkoScreen() {
       </div>
 
       {/* Single Result Display */}
-      {singleResult && !playing && (
+      {singlePocket != null && !playing && (
         <div
           className="mb-4 p-4 text-center rounded-lg border-2 bg-dungeon-panel max-w-xl mx-auto"
-          style={{ borderColor: slotColorForResult + '80' }}
+          style={{ borderColor: singlePocketColor + '80' }}
         >
           <p className="text-xs text-gray-500 mb-1">결과</p>
-          <p className="text-2xl font-bold mb-1" style={{ color: slotColorForResult }}>
-            {singleResult.reward.label}
+          <p className="text-2xl font-bold mb-1" style={{ color: singlePocketColor }}>
+            {singlePocketLabel}
           </p>
-          <p className="text-lg font-bold text-gray-200">
-            +{singleResult.reward.amount.toLocaleString()} {singleResult.reward.unit}
-          </p>
-          {singleResult.slot === 8 && (
+          {singlePocket === 0 && (
             <div className="mt-2 text-yellow-400 animate-pulse text-sm font-bold">
               JACKPOT!
             </div>
@@ -911,7 +897,7 @@ function PachinkoScreen() {
           <h3 className="text-sm font-bold text-yellow-400 mb-3">결과 요약</h3>
           <div className="flex flex-wrap gap-2 mb-3">
             {Object.entries(multiSummary.counts).map(([label, count]) => {
-              const cfg = SLOT_CONFIG.find((s) => s.label === label);
+              const cfg = POCKET_CONFIG.find((s) => s.label === label);
               return (
                 <span
                   key={label}
@@ -936,10 +922,10 @@ function PachinkoScreen() {
               {multiSummary.totalGems > 0 && (
                 <span className="text-cyan-400 font-bold ml-2">+{multiSummary.totalGems}젬</span>
               )}
-              {multiSummary.totalStones > 0 && (
-                <span className="text-green-400 font-bold ml-2">+강화석 {multiSummary.totalStones}개</span>
+              {multiSummary.totalItems > 0 && (
+                <span className="text-green-400 font-bold ml-2">+아이템 {multiSummary.totalItems}개</span>
               )}
-              {multiSummary.totalGold === 0 && multiSummary.totalGems === 0 && multiSummary.totalStones === 0 && (
+              {multiSummary.totalGold === 0 && multiSummary.totalGems === 0 && multiSummary.totalItems === 0 && (
                 <span className="text-gray-500">없음</span>
               )}
             </p>
@@ -957,9 +943,9 @@ function PachinkoScreen() {
         </p>
       </div>
 
-      {/* Slot Legend */}
+      {/* Pocket Legend */}
       <div className="mt-4 flex flex-wrap justify-center gap-1">
-        {SLOT_CONFIG.map((s) => (
+        {POCKET_CONFIG.map((s) => (
           <span
             key={s.id}
             className="text-[9px] px-1.5 py-0.5 rounded"
