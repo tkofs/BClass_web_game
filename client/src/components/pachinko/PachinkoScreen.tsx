@@ -357,6 +357,29 @@ function PachinkoScreen() {
             }));
           }
 
+          // Update bottom results in real-time
+          const pocketLabel = cfg?.label ?? '?';
+          let rGold = 0, rGems = 0, rItems = 0;
+          if (visualSlot === 0) { rGems = 500; rItems = 5; }
+          else if (visualSlot === 2) { rGems = 50; }
+          else if (visualSlot === 3) { rItems = 1; }
+          else if (visualSlot === 4) { rGold = 30000; }
+          else if (visualSlot === 5) { rItems = 2; }
+          else if (visualSlot === 6) { rGold = 80000; }
+          else if (visualSlot === 8) { rGold = 250000; }
+
+          setSinglePocket(visualSlot);
+          setMultiSummary(prev => {
+            const counts = { ...(prev?.counts ?? {}) };
+            counts[pocketLabel] = (counts[pocketLabel] || 0) + 1;
+            return {
+              counts,
+              totalGold: (prev?.totalGold ?? 0) + rGold,
+              totalGems: (prev?.totalGems ?? 0) + rGems,
+              totalItems: (prev?.totalItems ?? 0) + rItems,
+            };
+          });
+
           // Immediately send pocket result to server
           axios.post('/api/pachinko/pocket', { pocket: visualSlot }).then(res => {
             if (res.data.success && res.data.saveData) {
@@ -753,29 +776,8 @@ function PachinkoScreen() {
 
     batchesRef.current.push(batch);
 
-    // When all balls settle, show final summary
+    // When all balls settle, just stop playing
     onAllSettledRef.current = () => {
-      // Build summary from all settled balls
-      const allPockets = ballsRef.current.filter(b => b.settled).map(b => b.resultSlot);
-      const counts: Record<string, number> = {};
-      let totalGold = 0, totalGems = 0, totalItems = 0;
-      for (const p of allPockets) {
-        const cfg = POCKET_CONFIG[p];
-        if (cfg) counts[cfg.label] = (counts[cfg.label] || 0) + 1;
-        // Approximate reward values for display
-        if (p === 0) { totalGems += 500; totalItems += 5; } // jackpot
-        else if (p === 2) { totalGems += 50; } // gems
-        else if (p === 3) { totalItems += 1; } // epic stone
-        else if (p === 4) { totalGold += 30000; } // small gold
-        else if (p === 5) { totalItems += 2; } // rare stone
-        else if (p === 6) { totalGold += 80000; } // med gold
-        else if (p === 8) { totalGold += 250000; } // large gold
-      }
-      if (allPockets.length === 1) {
-        setSinglePocket(allPockets[0]);
-      } else {
-        setMultiSummary({ counts, totalGold, totalGems, totalItems });
-      }
       setPlaying(false);
       playingRef.current = false;
     };
@@ -976,7 +978,7 @@ function PachinkoScreen() {
       </div>
 
       {/* Single Result Display */}
-      {singlePocket != null && !playing && (
+      {singlePocket != null && (
         <div
           className="mb-4 p-4 text-center rounded-lg border-2 bg-dungeon-panel max-w-xl mx-auto"
           style={{ borderColor: singlePocketColor + '80' }}
@@ -994,7 +996,7 @@ function PachinkoScreen() {
       )}
 
       {/* Multi Result Summary */}
-      {multiSummary && !playing && (
+      {multiSummary && (
         <div className="mb-4 p-4 rounded-lg border border-gray-700 bg-dungeon-panel max-w-xl mx-auto">
           <h3 className="text-sm font-bold text-yellow-400 mb-3">결과 요약</h3>
           <div className="flex flex-wrap gap-2 mb-3">
