@@ -179,6 +179,7 @@ function PachinkoScreen() {
   const onAllSettledRef = useRef<(() => void) | null>(null);
   const jackpotFlashRef = useRef(0);
   const pendingCountRef = useRef<1 | 10 | 100>(1);
+  const pendingSpawnsRef = useRef(0);
 
   const gold = saveData?.gold ?? 0;
 
@@ -429,13 +430,13 @@ function PachinkoScreen() {
       }
     }
 
-    // Check if all settled
-    const activeBalls = balls.filter(b => b.active);
-    if (activeBalls.length > 0 && activeBalls.every(b => b.settled)) {
+    // Check if all balls settled (only if no more spawns pending)
+    const allBalls = ballsRef.current;
+    const unsettled = allBalls.filter(b => b.active && !b.settled);
+    if (allBalls.length > 0 && unsettled.length === 0 && pendingSpawnsRef.current <= 0) {
       if (onAllSettledRef.current) {
         const cb = onAllSettledRef.current;
         onAllSettledRef.current = null;
-        // Small delay so user sees the final state
         setTimeout(cb, 500);
       }
     }
@@ -756,6 +757,7 @@ function PachinkoScreen() {
       jackpotFlashRef.current = 0;
       setJackpotFlash(0);
       batchesRef.current = [];
+      pendingSpawnsRef.current = 0;
     }
 
     setPlaying(true);
@@ -768,15 +770,18 @@ function PachinkoScreen() {
 
     // Spawn balls with staggered timing
     const spawnInterval = count === 1 ? 0 : count === 10 ? 300 : 80;
+    pendingSpawnsRef.current += count;
 
     for (let i = 0; i < count; i++) {
       const idx = startIdx + i;
       batch.ballIndices.push(idx);
       if (i === 0) {
         spawnBall();
+        pendingSpawnsRef.current--;
       } else {
         setTimeout(() => {
           spawnBall();
+          pendingSpawnsRef.current--;
         }, i * spawnInterval);
       }
     }
