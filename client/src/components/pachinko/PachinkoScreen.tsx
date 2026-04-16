@@ -635,11 +635,11 @@ function PachinkoScreen() {
   }, []);
 
   /* ── Send results to server after all balls settle ── */
-  const sendResults = useCallback(async (count: 1 | 10 | 100, cost: number) => {
-    const pocketResults = ballsRef.current.map(b => b.resultSlot);
+  const sendResults = useCallback(async (count: 1 | 10 | 100, cost: number, pocketResults?: number[]) => {
+    const pockets = pocketResults ?? ballsRef.current.map(b => b.resultSlot);
 
     try {
-      const res = await axios.post('/api/pachinko/play', { count, pockets: pocketResults });
+      const res = await axios.post('/api/pachinko/play', { count, pockets });
       if (!res.data.success) {
         toast.error(res.data.message || '플레이에 실패했습니다.');
         setPlaying(false);
@@ -666,11 +666,9 @@ function PachinkoScreen() {
 
       // Show result
       if (count === 1) {
-        const pocket = pocketResults[0];
-        setSinglePocket(pocket);
+        setSinglePocket(pockets[0]);
       } else {
-        const summary = buildMultiSummary(pocketResults);
-        setMultiSummary(summary);
+        setMultiSummary(buildMultiSummary(pockets));
       }
     } catch (err: unknown) {
       const msg = axios.isAxiosError(err) && err.response?.data?.message
@@ -683,7 +681,10 @@ function PachinkoScreen() {
     }
   }, [updateSaveData]);
 
-  /* ── Play handler ── */
+  // Track pending batches for server calls
+  const batchesRef = useRef<{ count: number; cost: number; ballIndices: number[] }[]>([]);
+
+  /* ── Play handler (can be called multiple times) ── */
   const doPlay = useCallback((count: 1 | 10 | 100) => {
     const cost = count === 1 ? COST_1 : count === 10 ? COST_10 : COST_100;
     if (gold < cost) {
@@ -691,40 +692,59 @@ function PachinkoScreen() {
       return;
     }
 
-    // Regenerate peg layout each game
-    PEGS = buildPegs();
+    // First click: reset board
+    if (!playingRef.current) {
+      PEGS = buildPegs();
+      setSinglePocket(null);
+      setMultiSummary(null);
+      setRunningTally({});
+      ballsRef.current = [];
+      sparksRef.current = [];
+      pocketFlashRef.current = new Array(SLOT_COUNT).fill(0);
+      pocketPopupRef.current = new Array(SLOT_COUNT).fill(null);
+      jackpotFlashRef.current = 0;
+      setJackpotFlash(0);
+      batchesRef.current = [];
+    }
 
     setPlaying(true);
     playingRef.current = true;
-    setSinglePocket(null);
-    setMultiSummary(null);
-    setRunningTally({});
-    ballsRef.current = [];
-    sparksRef.current = [];
-    pocketFlashRef.current = new Array(SLOT_COUNT).fill(0);
-    pocketPopupRef.current = new Array(SLOT_COUNT).fill(null);
-    jackpotFlashRef.current = 0;
-    setJackpotFlash(0);
     pendingCountRef.current = count;
+
+    // Track this batch's ball indices
+    const startIdx = ballsRef.current.length;
+    const batch = { count, cost, ballIndices: [] as number[] };
 
     // Spawn balls with staggered timing
     const spawnInterval = count === 1 ? 0 : count === 10 ? 300 : 80;
 
     for (let i = 0; i < count; i++) {
+      const idx = startIdx + i;
+      batch.ballIndices.push(idx);
       if (i === 0) {
         spawnBall();
       } else {
         setTimeout(() => {
-          if (playingRef.current) {
-            spawnBall();
-          }
+          spawnBall();
         }, i * spawnInterval);
       }
     }
 
-    // Set callback for when all balls settle - THEN send to server
+    batchesRef.current.push(batch);
+
+    // Set callback for when ALL balls settle - send all batches to server
     onAllSettledRef.current = () => {
-      sendResults(count, cost);
+      const allBatches = batchesRef.current;
+      batchesRef.current = [];
+
+      // Send each batch independently
+      for (const b of allBatches) {
+        const pockets = b.ballIndices.map(idx => {
+          const ball = ballsRef.current[idx];
+          return ball ? ball.resultSlot : 4; // fallback to center
+        });
+        sendResults(b.count as 1 | 10 | 100, b.cost, pockets);
+      }
     };
 
     // Safety timeout
@@ -850,7 +870,7 @@ function PachinkoScreen() {
       <div className="grid grid-cols-3 gap-2 mb-4 max-w-xl mx-auto">
         <Button
           onClick={() => doPlay(1)}
-          disabled={playing || gold < COST_1}
+          disabled={gold < COST_1}
           className="py-3 bg-dungeon-panel border border-yellow-500/30 hover:border-yellow-500/60 hover:bg-yellow-500/10 transition-all disabled:opacity-40"
         >
           <div className="text-center">
@@ -860,7 +880,7 @@ function PachinkoScreen() {
         </Button>
         <Button
           onClick={() => doPlay(10)}
-          disabled={playing || gold < COST_10}
+          disabled={gold < COST_10}
           className="py-3 bg-dungeon-panel border border-yellow-500/40 hover:border-yellow-500/70 hover:bg-yellow-500/15 transition-all disabled:opacity-40 relative"
         >
           <div className="text-center">
@@ -873,7 +893,7 @@ function PachinkoScreen() {
         </Button>
         <Button
           onClick={() => doPlay(100)}
-          disabled={playing || gold < COST_100}
+          disabled={gold < COST_100}
           className="py-3 bg-dungeon-panel border border-yellow-500/50 hover:border-yellow-500/80 hover:bg-yellow-500/20 transition-all disabled:opacity-40 relative"
         >
           <div className="text-center">
