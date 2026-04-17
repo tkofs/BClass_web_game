@@ -16,12 +16,12 @@ const linear = (base: number) => (level: number) => base * level;
 export const ARTIFACTS: Artifact[] = [
   {
     id: 'art_exp', name: '경험의 서', description: '경험치 획득량 증가',
-    icon: '\uD83D\uDCD6', maxLevel: 20, costPerLevel: linear(200), effectPerLevel: 10,
+    icon: '\uD83D\uDCD6', maxLevel: 40, costPerLevel: linear(100), effectPerLevel: 2.5,
     effectType: 'expPercent', effectUnit: '%',
   },
   {
     id: 'art_gold', name: '재물의 서', description: '골드 획득량 증가',
-    icon: '\uD83D\uDCB0', maxLevel: 20, costPerLevel: linear(200), effectPerLevel: 10,
+    icon: '\uD83D\uDCB0', maxLevel: 100, costPerLevel: linear(100), effectPerLevel: 1,
     effectType: 'goldPercent', effectUnit: '%',
   },
   {
@@ -51,7 +51,7 @@ export const ARTIFACTS: Artifact[] = [
   },
   {
     id: 'art_gem', name: '젬 증폭기', description: '환생 시 젬 획득량 증가',
-    icon: '\uD83D\uDC8E', maxLevel: 20, costPerLevel: linear(300), effectPerLevel: 10,
+    icon: '\uD83D\uDC8E', maxLevel: 100, costPerLevel: linear(225), effectPerLevel: 1,
     effectType: 'gemPercent', effectUnit: '%',
   },
   {
@@ -60,13 +60,13 @@ export const ARTIFACTS: Artifact[] = [
     effectType: 'prestigeLevelKeep', effectUnit: '%',
   },
   {
-    id: 'art_abyss_keep', name: '심연의 닻', description: '환생 후 심연 진행도 일부 유지 (최대 50%)',
-    icon: '\u2693', maxLevel: 20, costPerLevel: linear(400), effectPerLevel: 2.5,
+    id: 'art_abyss_keep', name: '심연의 닻', description: '환생 후 심연 진행도 일부 유지 (최대 70%)',
+    icon: '\u2693', maxLevel: 28, costPerLevel: linear(400), effectPerLevel: 2.5,
     effectType: 'prestigeAbyssKeep', effectUnit: '%',
   },
   {
-    id: 'art_gold_keep', name: '황금의 보관함', description: '환생 후 골드 일부 유지 (최대 50%)',
-    icon: '\uD83C\uDFF0', maxLevel: 20, costPerLevel: linear(400), effectPerLevel: 2.5,
+    id: 'art_gold_keep', name: '황금의 보관함', description: '환생 후 골드 일부 유지 (최대 100%)',
+    icon: '\uD83C\uDFF0', maxLevel: 40, costPerLevel: linear(400), effectPerLevel: 2.5,
     effectType: 'prestigeGoldKeep', effectUnit: '%',
   },
   {
